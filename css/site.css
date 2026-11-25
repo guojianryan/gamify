@@ -459,15 +459,6 @@ button.bit:not(:disabled):hover {
   box-shadow: inset 0 0 0 2px var(--stamp);
 }
 
-.row.entering {
-  z-index: 2;
-  animation: drop var(--drop-ms, 8000ms) linear both;
-}
-
-.row.entering.frozen {
-  animation-play-state: paused;
-}
-
 .row.shake .bit,
 .row.shake .ticket {
   animation: shake 180ms ease;
@@ -1032,15 +1023,6 @@ body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-@keyframes drop {
-  from {
-    transform: translateY(var(--drop, 0px));
-  }
-  to {
-    transform: translateY(0);
-  }
 }
 
 @keyframes well-hit {

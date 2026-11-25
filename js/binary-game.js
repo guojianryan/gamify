@@ -391,57 +391,23 @@
         }
       }, prefersReducedMotion() ? 0 : CLEAR_MS);
     });
-    var parked = false;
     state.rows.forEach(function (row, index) {
       var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
       if (el && el.dataset.mode !== row.mode) {
         el.remove();
         el = null;
       }
-      var fresh = false;
       if (!el) {
-        if (!parked) {
-          parkRows();
-          parked = true;
-        }
         el = buildRow(row);
         var live = Array.prototype.filter.call(board.children, function (child) {
           return !child.classList.contains('clearing');
         });
         if (live[index]) board.insertBefore(el, live[index]);
         else board.appendChild(el);
-        fresh = true;
       }
-      // Newest row has the lowest order, so it rests above the rows already in play.
+      // Newest row has the lowest order, so it appears above the rows already in play.
       el.style.order = String(state.rows.length - index);
-      if (fresh) armDrop(el, board);
       updateRow(el, row);
-    });
-  }
-
-  function parkRows() {
-    document.querySelectorAll('#board .row.entering').forEach(function (row) {
-      row.classList.remove('entering', 'frozen');
-    });
-  }
-
-  function armDrop(el, board) {
-    var ms = logic.spawnDelay(state);
-    var distance = board.getBoundingClientRect().top - el.getBoundingClientRect().top;
-    el.style.setProperty('--drop', distance + 'px');
-    el.style.setProperty('--drop-ms', ms + 'ms');
-    el.dataset.dropMs = String(ms);
-    if (prefersReducedMotion() || distance > -1) return;
-    el.classList.add('entering');
-    if (clock && clock.held) el.classList.add('frozen');
-    el.addEventListener('animationend', function (event) {
-      if (event.animationName === 'drop') el.classList.remove('entering');
-    });
-  }
-
-  function freezeDrops(frozen) {
-    document.querySelectorAll('#board .row.entering').forEach(function (row) {
-      row.classList.toggle('frozen', frozen);
     });
   }
 
@@ -576,7 +542,7 @@
       empty.textContent = 'Warm-up. The next row is on the way.';
     } else if (state.status === 'ready') {
       empty.textContent = storageGet(GUIDE_KEY) === '1'
-        ? 'Press start. The first row appears at the top of the column.'
+        ? 'Press start. The first row appears at the bottom of the well.'
         : 'Press start. The first row shows you which bits to tap.';
     } else {
       empty.textContent = 'Column clear.';
@@ -830,7 +796,6 @@
       started: performance.now(),
       delay: delay
     };
-    freezeDrops(false);
     tickMeter();
   }
 
@@ -850,7 +815,6 @@
     if (frameId) cancelAnimationFrame(frameId);
     frameId = 0;
     clock = { held: true, handle: 0, delay: remaining, fraction: fraction };
-    freezeDrops(true);
     paintMeter();
   }
 
