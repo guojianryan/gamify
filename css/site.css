@@ -458,6 +458,57 @@ button.bit:not(:disabled):hover {
   animation: shake 180ms ease;
 }
 
+.row.clearing {
+  animation: clear-row 450ms ease forwards;
+  pointer-events: none;
+}
+
+.lesson {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 4px 2px 0;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: var(--stamp);
+}
+
+.bit.hint {
+  box-shadow: inset 0 0 0 3px var(--moss);
+}
+
+.bit.miss {
+  box-shadow: inset 0 0 0 3px var(--stamp);
+  background: #f6d9d2;
+}
+
+.bit.miss.on {
+  background: var(--stamp);
+  border-color: var(--stamp);
+  color: var(--sheet);
+}
+
+.guide {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--moss);
+  background: #e5f2ea;
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.pace-note,
+.best-pace {
+  max-width: 36rem;
+  color: var(--ink-soft);
+}
+
+.weak {
+  font-family: var(--mono);
+  color: var(--stamp);
+}
+
 .setup {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
@@ -588,6 +639,28 @@ legend {
   line-height: 1;
 }
 
+.pace-name {
+  font-size: 1.05rem;
+  letter-spacing: -0.03em;
+}
+
+.mult {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-style: normal;
+  color: var(--ink-soft);
+}
+
+.mult.hot {
+  color: var(--stamp);
+}
+
+.mult.pop {
+  animation: bump 420ms ease;
+}
+
 .pips {
   display: flex;
   gap: 3px;
@@ -663,9 +736,7 @@ legend {
 }
 
 .play-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 22px;
+  display: block;
   padding: 16px 28px 8px;
 }
 
@@ -712,7 +783,7 @@ body:not([data-status="playing"]) .meter {
 
 .board-wrap {
   position: relative;
-  overflow-x: auto;
+  overflow: visible;
   padding-bottom: 4px;
 }
 
@@ -759,12 +830,15 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
   font-size: 2rem;
 }
 
-.side h2 {
-  font-size: 1.4rem;
+.howto {
+  margin: 4px 28px 16px;
+  padding: 14px 16px 6px;
+  border: 1.5px solid var(--ink);
+  background: var(--ticket);
 }
 
-.howto {
-  margin-top: 16px;
+.howto h2 {
+  font-size: 1.6rem;
 }
 
 .howto ol {
@@ -781,10 +855,79 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
   font-size: 0.92rem;
 }
 
+.keypad {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: var(--sheet);
+  border-top: 1.5px solid var(--ink);
+}
+
+body[data-game="binary"] {
+  --keypad-space: 292px;
+}
+
+body[data-game="binary"] .shell {
+  margin-bottom: 0;
+  padding-bottom: calc(var(--keypad-space) + 28px);
+}
+
+.menu-panel {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--keypad-space) + 8px + env(safe-area-inset-bottom));
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: min(260px, calc(100% - 24px));
+  padding: 12px;
+  border: 1.5px solid var(--ink);
+  background: var(--ticket);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.menu-panel .button {
+  width: 100%;
+  box-shadow: none;
+}
+
+.moment {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(27, 25, 20, 0.72);
+  color: var(--sheet);
+  text-align: center;
+}
+
+.moment .kicker {
+  color: #f0c1b6;
+}
+
+.moment strong {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(3.2rem, 12vw, 6rem);
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+}
+
 .keypad-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .keypad-grid button {
@@ -858,6 +1001,17 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
   100% { opacity: 0; transform: translateY(-16px); }
 }
 
+@keyframes clear-row {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes bump {
+  50% { transform: scale(1.28); }
+}
+
 @media (max-width: 860px) {
   .hero,
   .setup,
@@ -872,6 +1026,45 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 
   .hud-controls {
     justify-content: flex-start;
+  }
+
+  .ruler,
+  .row {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+
+  .ticket {
+    grid-column: 1 / -1;
+    min-height: 52px;
+  }
+
+  .ruler .eq {
+    display: none;
+  }
+
+  .bit {
+    height: 68px;
+    font-size: 1.45rem;
+  }
+
+  .board,
+  body:not([data-status="playing"]):not([data-status="paused"]) .board {
+    min-height: 0;
+  }
+
+  .guide {
+    font-size: 1.25rem;
+  }
+
+  .play-layout,
+  .hud {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .ruler,
+  .row {
+    gap: 4px;
   }
 
   .shell {
@@ -915,6 +1108,12 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
   .results {
     margin-left: 16px;
     margin-right: 16px;
+  }
+
+  body[data-game="binary"] .play-layout,
+  body[data-game="binary"] .hud {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }
 

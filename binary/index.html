@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/site.css">
 </head>
-<body data-status="ready">
+<body data-status="ready" data-game="binary">
   <a class="skip" href="#board">Skip to the column</a>
   <div class="shell">
     <header class="mast">
@@ -31,32 +31,8 @@
           <p class="deck">Rows fill the column from the top. Set the bits when a decimal is showing, or type the decimal when the bits are already set. Clear a row before the column is full.</p>
         </div>
         <form id="setup-form">
-          <fieldset>
-            <legend>Start from</legend>
-            <div class="paces">
-              <label class="pace">
-                <input type="radio" name="pace" value="1" checked>
-                <span>
-                  <strong>Warm-up</strong>
-                  <small>Numbers 1–15. Place values stay on. You only set bits.</small>
-                </span>
-              </label>
-              <label class="pace">
-                <input type="radio" name="pace" value="3">
-                <span>
-                  <strong>Drill</strong>
-                  <small>Numbers up to 63. You set bits and read bits.</small>
-                </span>
-              </label>
-              <label class="pace">
-                <input type="radio" name="pace" value="5">
-                <span>
-                  <strong>Exam pace</strong>
-                  <small>Full bytes, 1–255. Place values start hidden.</small>
-                </span>
-              </label>
-            </div>
-          </fieldset>
+          <p class="pace-note">You start at Warm-up. Eight clean rows move you to Drill, then to Exam pace.</p>
+          <p id="best-pace" class="best-pace" hidden></p>
           <button class="button" type="submit" id="start">Start</button>
         </form>
       </section>
@@ -69,8 +45,8 @@
             <em id="gain" class="gain" aria-hidden="true"></em>
           </div>
           <div class="stat">
-            <span>Level</span>
-            <strong id="level">1</strong>
+            <span>Pace</span>
+            <strong id="pace" class="pace-name">Warm-up</strong>
             <div id="pips" class="pips" aria-hidden="true"></div>
           </div>
           <div class="stat">
@@ -80,16 +56,14 @@
           <div class="stat">
             <span>Streak</span>
             <strong id="streak">0</strong>
+            <em id="mult" class="mult">×1</em>
           </div>
           <div class="stat">
             <span>Best</span>
             <strong id="best">0</strong>
           </div>
           <div class="hud-controls">
-            <label class="check"><input type="checkbox" id="coach"> Running totals</label>
-            <label class="check"><input type="checkbox" id="force-values"> Always show place values</label>
-            <button type="button" class="button secondary" id="mute">Sound on</button>
-            <button type="button" class="button secondary" id="pause" hidden>Pause</button>
+            <button type="button" class="button secondary" id="menu-toggle" aria-expanded="false" aria-controls="menu-panel">Menu</button>
           </div>
           <p id="toast" class="toast" hidden></p>
         </div>
@@ -98,6 +72,7 @@
           <div class="play" id="playfield">
             <p class="pressure" id="pressure"></p>
             <div class="meter" aria-hidden="true"><span id="meter"></span></div>
+            <p id="guide" class="guide" hidden></p>
             <div class="board-wrap">
               <div class="ruler" id="ruler"></div>
               <div class="board" id="board"></div>
@@ -111,36 +86,17 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <aside class="side">
-            <div class="keypad" id="keypad">
-              <p class="kicker">Decimal keypad</p>
-              <div class="keypad-grid">
-                <button type="button" data-key="1">1</button>
-                <button type="button" data-key="2">2</button>
-                <button type="button" data-key="3">3</button>
-                <button type="button" data-key="4">4</button>
-                <button type="button" data-key="5">5</button>
-                <button type="button" data-key="6">6</button>
-                <button type="button" data-key="7">7</button>
-                <button type="button" data-key="8">8</button>
-                <button type="button" data-key="9">9</button>
-                <button type="button" data-key="clear">Clear</button>
-                <button type="button" data-key="0">0</button>
-                <button type="button" data-key="back">Del</button>
-                <button type="button" data-key="enter">Enter</button>
-              </div>
-            </div>
-            <div class="howto">
-              <h2>How a row works</h2>
-              <ol>
-                <li><strong>Number on the right.</strong> Click bits until the 1s add up to it. The row clears on its own.</li>
-                <li><strong>Blank on the right.</strong> The bits are fixed. Type their total and press Enter.</li>
-                <li><strong>The column fills.</strong> Six rows fit. One more arrival ends the round.</li>
-              </ol>
-              <p class="keys">Click a row to select it. On a bit row, keys 1–8 flip columns from the left. On a decimal row, the number keys type. Enter submits. P pauses.</p>
-            </div>
-          </aside>
+        <div class="howto" id="howto" hidden>
+          <h2>How a row works</h2>
+          <ol>
+            <li><strong>Number on the right.</strong> Tap bits until the 1s add up to it. The row clears on its own.</li>
+            <li><strong>Blank on the right.</strong> The bits are fixed. Type their total and press Enter.</li>
+            <li><strong>A miss stays up.</strong> Read the working, then try that row once more.</li>
+            <li><strong>The column fills.</strong> Six rows fit. One more arrival ends the round.</li>
+          </ol>
+          <p class="keys">Tap a row to select it. On a bit row, keys 1–8 flip columns from the left. On a decimal row, the number keys type. Enter submits. P pauses.</p>
         </div>
       </section>
 
@@ -156,9 +112,38 @@
     </main>
 
     <footer class="colophon">
-      <p>Eight clears raise the level. The rows then come faster, and the numbers get larger. Scores stay in this browser.</p>
+      <p>Eight clean rows move you from Warm-up to Drill, then to Exam pace. A miss stays up long enough to read, and one retry still scores. Scores and weak spots stay in this browser.</p>
       <p><a href="../">All lessons</a></p>
     </footer>
+  </div>
+  <div id="menu-panel" class="menu-panel" hidden>
+    <label class="check"><input type="checkbox" id="coach"> Running totals</label>
+    <label class="check"><input type="checkbox" id="force-values"> Place values</label>
+    <button type="button" class="button secondary" id="mute">Sound on</button>
+    <button type="button" class="button secondary" id="pause" hidden>Pause</button>
+    <button type="button" class="button secondary" id="show-howto" aria-expanded="false" aria-controls="howto">How to play</button>
+  </div>
+  <div class="keypad" id="keypad">
+    <h2 class="sr-only">Decimal keypad</h2>
+    <div class="keypad-grid">
+      <button type="button" data-key="1">1</button>
+      <button type="button" data-key="2">2</button>
+      <button type="button" data-key="3">3</button>
+      <button type="button" data-key="4">4</button>
+      <button type="button" data-key="5">5</button>
+      <button type="button" data-key="6">6</button>
+      <button type="button" data-key="7">7</button>
+      <button type="button" data-key="8">8</button>
+      <button type="button" data-key="9">9</button>
+      <button type="button" data-key="clear">Clear</button>
+      <button type="button" data-key="0">0</button>
+      <button type="button" data-key="back">Del</button>
+      <button type="button" data-key="enter">Enter</button>
+    </div>
+  </div>
+  <div id="moment" class="moment" hidden>
+    <p class="kicker">Next pace</p>
+    <strong id="moment-name"></strong>
   </div>
   <p class="sr-only" id="live" aria-live="polite"></p>
   <noscript>This game needs JavaScript.</noscript>

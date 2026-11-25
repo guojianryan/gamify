@@ -65,7 +65,7 @@ test('a warm-up row is bits only, inside 1..15, and does not repeat', () => {
   assert.ok(again.state.rows[1].value <= 15);
 });
 
-test('setting the bits clears only that row and scores a streak', () => {
+test('a wrong bit stays up with the working, then one retry scores half', () => {
   let state = L.startGame(L.createGame(), () => 0).state;
   const first = state.rows[0];
   state = L.spawnRow(state, () => 0).state;
@@ -75,20 +75,30 @@ test('setting the bits clears only that row and scores a streak', () => {
 
   const early = L.toggleBit(state, first.id, 0);
   assert.equal(early.state.rows.length, 2);
+  assert.equal(early.state.rows[0].phase, 'teach');
   assert.equal(early.state.rows[0].bits[0], 1);
+  assert.equal(early.state.rows[0].feedback, 'You set 128 = 128. Target 1 = 1');
+  assert.deepEqual(early.state.rows[0].wrongIndexes, [0, 7]);
+  assert.equal(early.state.misses[0], 1);
+  assert.equal(early.events[0].type, 'teach');
   assert.deepEqual(state.rows[0].bits, [0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(L.toggleBit(early.state, first.id, 0).state, early.state);
 
-  const back = L.toggleBit(early.state, first.id, 0).state;
-  const solved = L.toggleBit(back, first.id, 7);
+  const retry = L.releaseHold(early.state, first.id);
+  assert.equal(retry.state.rows[0].phase, 'play');
+  assert.deepEqual(retry.state.rows[0].bits, [0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(retry.state.rows[0].feedback, early.state.rows[0].feedback);
+
+  const solved = L.toggleBit(retry.state, first.id, 7);
   assert.equal(solved.state.rows.length, 1);
   assert.equal(solved.state.rows[0].id, second.id);
-  assert.equal(solved.state.score, L.pointsFor(1, 1));
-  assert.equal(solved.state.streak, 1);
-  assert.equal(solved.events[0].type, 'solved');
-  assert.equal(L.toggleBit(solved.state, first.id, 7).state.rows.length, 1);
+  assert.equal(solved.state.score, L.partialPoints(1));
+  assert.equal(solved.state.streak, 0);
+  assert.equal(solved.events[0].partial, true);
+  assert.equal(L.weakSpotText(early.state.misses), 'Weak spots: 128s and 1s');
 });
 
-test('eight clears raise the level and total 660 at warm-up pace', () => {
+test('eight clean rows move from Warm-up to Drill and total 660', () => {
   let state = L.startGame(L.createGame(), () => 0).state;
   let last = null;
   for (let i = 0; i < 7; i += 1) {
@@ -103,13 +113,15 @@ test('eight clears raise the level and total 660 at warm-up pace', () => {
     last = L.toggleBit(state, row.id, index);
     state = last.state;
   });
-  assert.equal(state.level, 2);
+  assert.equal(state.level, 3);
+  assert.equal(L.paceName(state), 'Drill');
   assert.equal(state.solved, 8);
-  assert.equal(state.solvedThisLevel, 0);
+  assert.equal(state.cleanRows, 0);
   assert.equal(state.score, 660);
   assert.equal(state.highScore, 660);
   assert.equal(state.bestStreak, 8);
-  assert.ok(last.events.some((event) => event.type === 'level' && event.level === 2));
+  assert.equal(L.streakMultiplier(8), 5);
+  assert.ok(last.events.some((event) => event.type === 'pace' && event.name === 'Drill'));
 });
 
 test('decimal rows stay until the typed total is right', () => {
@@ -130,16 +142,22 @@ test('decimal rows stay until the typed total is right', () => {
   assert.equal(wrong.result, 'wrong');
   assert.equal(wrong.state.streak, 0);
   assert.equal(wrong.state.score, 200);
-  assert.equal(wrong.state.rows[0].wrong, true);
-  assert.equal(wrong.events[0].type, 'wrong');
+  assert.equal(wrong.state.rows[0].phase, 'teach');
+  assert.equal(wrong.state.rows[0].feedback, '1 = 1');
+  assert.deepEqual(wrong.state.rows[0].wrongIndexes, [7]);
+  assert.equal(wrong.state.misses[7], 1);
+  assert.equal(wrong.events[0].type, 'teach');
+  assert.equal(L.setDraft(wrong.state, row.id, '1').state, wrong.state);
 
-  const fixed = L.setDraft(wrong.state, row.id, '1');
+  const released = L.releaseHold(wrong.state, row.id);
+  const fixed = L.setDraft(released.state, row.id, '1');
   assert.equal(fixed.state.rows[0].wrong, false);
   const correct = L.submitDecimal(fixed.state, row.id);
   assert.equal(correct.result, 'correct');
   assert.equal(correct.state.rows.length, 0);
-  assert.equal(correct.state.streak, 1);
-  assert.equal(correct.state.score, 200 + L.pointsFor(5, 1));
+  assert.equal(correct.state.streak, 0);
+  assert.equal(correct.state.score, 200 + L.partialPoints(5));
+  assert.equal(correct.events[0].partial, true);
 });
 
 test('a matching bit pattern does not clear a decimal row by itself', () => {
@@ -194,4 +212,72 @@ test('points cap the streak bonus at ten', () => {
   assert.equal(L.pointsFor(1, 10), 110);
   assert.equal(L.pointsFor(1, 11), 110);
   assert.equal(L.pointsFor(5, 1), 105);
+  assert.equal(L.partialPoints(5), 53);
+  assert.equal(L.streakMultiplier(0), 1);
+  assert.equal(L.streakMultiplier(3), 3);
+});
+
+test('a second miss reveals the byte and then leaves', () => {
+  let state = { ...L.createGame(), status: 'playing', level: 5, score: 40, streak: 2 };
+  state = L.spawnRow(state, sequence([0.2, 0.99])).state;
+  const row = state.rows[0];
+  assert.equal(row.mode, 'decimal');
+  state = L.setDraft(state, row.id, '3').state;
+  const first = L.submitDecimal(state, row.id);
+  const released = L.releaseHold(first.state, row.id);
+  const again = L.setDraft(released.state, row.id, '4').state;
+  const second = L.submitDecimal(again, row.id);
+  assert.equal(second.state.rows[0].phase, 'reveal');
+  assert.equal(second.state.rows[0].feedback, L.expression(row.value) + ' = ' + row.value);
+  assert.equal(second.state.score, 40);
+  const gone = L.releaseHold(second.state, row.id);
+  assert.equal(gone.state.rows.length, 0);
+  assert.equal(gone.events[0].type, 'dismissed');
+});
+
+test('the guided first row is 10, and a clean miss names both places', () => {
+  const started = L.startGame(L.createGame(), () => 0, { guide: true });
+  const row = started.state.rows[0];
+  assert.equal(row.value, 10);
+  assert.equal(row.mode, 'bits');
+  assert.equal(started.state.guide, true);
+  assert.equal(L.spawnRow(started.state, () => 0).events.length, 0);
+
+  let state = L.toggleBit(started.state, row.id, 5).state;
+  assert.equal(state.rows[0].feedback, 'You set 4 = 4. Target 10 = 8 + 2');
+  assert.equal(L.weakSpotText([0, 0, 0, 2, 5, 0, 1, 0]), 'Weak spots: 8s and 16s');
+  state = L.releaseHold(state, row.id).state;
+  state = L.toggleBit(state, row.id, 4).state;
+  state = L.toggleBit(state, row.id, 6).state;
+  assert.equal(state.rows.length, 0);
+  assert.equal(state.guide, false);
+  assert.equal(state.score, L.partialPoints(1));
+});
+
+test('misses and the best pace carry into the next warm-up', () => {
+  let state = L.startGame(L.createGame(), () => 0).state;
+  state = L.toggleBit(state, state.rows[0].id, 0).state;
+  const misses = state.misses.slice();
+  state = { ...state, paceIndex: 2, bestPaceIndex: 2, level: 5 };
+  const next = L.startGame(state, () => 0).state;
+  assert.deepEqual(next.misses, misses);
+  assert.equal(next.bestPaceIndex, 2);
+  assert.equal(next.paceIndex, 0);
+  assert.equal(next.level, 1);
+  assert.equal(L.paceName(2), 'Exam pace');
+});
+
+test('missing the guided row twice brings the same target back', () => {
+  let state = L.startGame(L.createGame(), () => 0, { guide: true }).state;
+  const row = state.rows[0];
+  state = L.toggleBit(state, row.id, 0).state;
+  state = L.releaseHold(state, row.id).state;
+  state = L.toggleBit(state, row.id, 0).state;
+  assert.equal(state.rows[0].phase, 'reveal');
+  const again = L.releaseHold(state, row.id);
+  assert.equal(again.state.guide, true);
+  assert.equal(again.state.rows.length, 1);
+  assert.equal(again.state.rows[0].value, 10);
+  assert.equal(again.state.rows[0].phase, 'play');
+  assert.notEqual(again.state.rows[0].id, row.id);
 });

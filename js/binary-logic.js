@@ -1,7 +1,7 @@
 // Pure rules for the 8-bit conversion drill.
 // A row is either "bits" (a decimal is given, click bits until they add up)
-// or "decimal" (bits are fixed, type the total). Rows stack until the column
-// is full. The next arrival after a full column ends the round.
+// or "decimal" (bits are fixed, type the total). A wrong pattern stays up
+// long enough to read, with one retry for partial credit.
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) {
@@ -15,7 +15,14 @@
   var BIT_VALUES = Object.freeze([128, 64, 32, 16, 8, 4, 2, 1]);
   var MAX_ROWS = 6;
   var SOLVES_PER_LEVEL = 8;
+  var CLEAN_ROWS_PER_PACE = 8;
   var SPAWN_FLOOR_MS = 3200;
+  var GUIDE_VALUE = 10;
+  var PACES = [
+    { id: 'warmup', name: 'Warm-up', level: 1 },
+    { id: 'drill', name: 'Drill', level: 3 },
+    { id: 'exam', name: 'Exam pace', level: 5 }
+  ];
 
   // Level 1–2 are small numbers and bit-setting only, with place values shown.
   // From level 3 the drill mixes in "read the bits". Place values hide at level 4.
@@ -49,6 +56,25 @@
     };
   }
 
+  function emptyMisses() {
+    return BIT_VALUES.map(function () { return 0; });
+  }
+
+  function paceIndexForLevel(level) {
+    if (level >= 5) return 2;
+    if (level >= 3) return 1;
+    return 0;
+  }
+
+  function paceName(stateOrIndex) {
+    var index = typeof stateOrIndex === 'number'
+      ? stateOrIndex
+      : (stateOrIndex && stateOrIndex.paceIndex) || 0;
+    if (index < 0) index = 0;
+    if (index >= PACES.length) index = PACES.length - 1;
+    return PACES[index].name;
+  }
+
   function createGame(highScore) {
     var best = Number(highScore);
     return {
@@ -58,11 +84,16 @@
       streak: 0,
       bestStreak: 0,
       level: 1,
+      paceIndex: 0,
+      cleanRows: 0,
       solvedThisLevel: 0,
       solved: 0,
       highScore: Number.isFinite(best) && best > 0 ? Math.floor(best) : 0,
+      bestPaceIndex: 0,
       nextId: 1,
-      lastValue: null
+      lastValue: null,
+      misses: emptyMisses(),
+      guide: false
     };
   }
 
@@ -87,14 +118,72 @@
     return parts.length ? parts.join(' + ') : '0';
   }
 
+  function streakMultiplier(streak) {
+    var n = streak | 0;
+    if (n < 1) return 1;
+    return Math.min(n, 5);
+  }
+
   function pointsFor(level, streak) {
     var safeLevel = normalizeLevel(level);
     var safeStreak = Math.max(0, streak | 0);
     return 50 + safeLevel * 10 + Math.min(safeStreak, 10) * 5;
   }
 
-  // Draws 1..max. `rng` is called once. Avoids repeating the previous target
-  // when there is another number in range.
+  function partialPoints(level) {
+    return Math.max(10, Math.round(pointsFor(level, 1) / 2));
+  }
+
+  function differingIndexes(bits, value) {
+    var target = bitsFor(value);
+    var indexes = [];
+    for (var i = 0; i < BIT_VALUES.length; i += 1) {
+      if ((bits[i] ? 1 : 0) !== target[i]) indexes.push(i);
+    }
+    return indexes;
+  }
+
+  // Still building: every 1 is part of the answer, and the sum is short.
+  function isBuilding(bits, value) {
+    if (valueOf(bits) === value) return false;
+    var target = bitsFor(value);
+    for (var i = 0; i < BIT_VALUES.length; i += 1) {
+      if (bits[i] && !target[i]) return false;
+    }
+    return true;
+  }
+
+  function bitLesson(bits, value) {
+    var sum = valueOf(bits);
+    return 'You set ' + expression(sum) + ' = ' + sum + '. Target ' + value + ' = ' + expression(value);
+  }
+
+  function decimalLesson(value) {
+    return expression(value) + ' = ' + value;
+  }
+
+  function addMisses(misses, indexes) {
+    var next = (misses || emptyMisses()).slice();
+    indexes.forEach(function (index) {
+      next[index] = (next[index] || 0) + 1;
+    });
+    return next;
+  }
+
+  function weakSpotText(misses) {
+    var ranked = BIT_VALUES.map(function (value, index) {
+      return { value: value, count: misses && misses[index] ? misses[index] : 0 };
+    }).filter(function (item) {
+      return item.count > 0;
+    }).sort(function (a, b) {
+      return b.count - a.count || b.value - a.value;
+    }).slice(0, 2);
+    if (!ranked.length) return '';
+    var names = ranked.map(function (item) { return item.value + 's'; });
+    if (names.length === 1) return 'Weak spots: ' + names[0];
+    return 'Weak spots: ' + names[0] + ' and ' + names[1];
+  }
+
   function randomValue(max, rng, avoid) {
     var cap = Math.max(1, max | 0);
     var value = 1 + Math.floor(rng() * cap);
@@ -106,52 +195,75 @@
     return value;
   }
 
+  function blankRow(id, mode, value) {
+    return {
+      id: id,
+      mode: mode,
+      value: value,
+      bits: mode === 'bits' ? BIT_VALUES.map(function () { return 0; }) : bitsFor(value),
+      draft: '',
+      wrong: false,
+      retries: 0,
+      phase: 'play',
+      feedback: '',
+      wrongIndexes: []
+    };
+  }
+
   function awardClear(state, ids) {
     var events = [];
-    var next = {
-      status: state.status,
-      rows: state.rows.filter(function (row) {
-        return ids.indexOf(row.id) === -1;
-      }),
-      score: state.score,
-      streak: state.streak,
-      bestStreak: state.bestStreak,
-      level: state.level,
-      solvedThisLevel: state.solvedThisLevel,
-      solved: state.solved,
-      highScore: state.highScore,
-      nextId: state.nextId,
-      lastValue: state.lastValue
-    };
+    var kept = state.rows.filter(function (row) {
+      return ids.indexOf(row.id) === -1;
+    });
+    var next = copyState(state, { rows: kept });
 
     ids.forEach(function (id) {
-      var streak = next.streak + 1;
-      var gained = pointsFor(next.level, streak);
+      var source = findRow(state, id);
+      var partial = !!(source && source.retries > 0);
+      var streak = partial ? next.streak : next.streak + 1;
+      var gained = partial ? partialPoints(next.level) : pointsFor(next.level, streak);
       var score = next.score + gained;
       var level = next.level;
-      var solvedThisLevel = next.solvedThisLevel + 1;
-      var leveled = false;
-      if (solvedThisLevel >= SOLVES_PER_LEVEL) {
-        level += 1;
-        solvedThisLevel = 0;
-        leveled = true;
+      var paceIndex = next.paceIndex || 0;
+      var cleanRows = next.cleanRows || 0;
+      var paced = false;
+      if (!partial) {
+        cleanRows += 1;
+        if (cleanRows >= CLEAN_ROWS_PER_PACE) {
+          if (paceIndex < PACES.length - 1) {
+            paceIndex += 1;
+            level = PACES[paceIndex].level;
+            paced = true;
+          }
+          cleanRows = 0;
+        }
       }
       var highScore = Math.max(next.highScore, score);
-      events.push({ type: 'solved', rowId: id, gained: gained, score: score });
-      if (leveled) events.push({ type: 'level', level: level });
-      next = {
-        status: next.status,
-        rows: next.rows,
+      var bestPaceIndex = Math.max(next.bestPaceIndex || 0, paceIndex);
+      events.push({
+        type: 'solved',
+        rowId: id,
+        gained: gained,
+        score: score,
+        partial: partial,
+        multiplier: streakMultiplier(streak)
+      });
+      if (paced) {
+        events.push({ type: 'pace', name: PACES[paceIndex].name, level: level, paceIndex: paceIndex });
+      }
+      next = copyState(next, {
         score: score,
         streak: streak,
         bestStreak: Math.max(next.bestStreak, streak),
         level: level,
-        solvedThisLevel: solvedThisLevel,
+        paceIndex: paceIndex,
+        cleanRows: cleanRows,
+        solvedThisLevel: cleanRows,
         solved: next.solved + 1,
         highScore: highScore,
-        nextId: next.nextId,
-        lastValue: next.lastValue
-      };
+        bestPaceIndex: bestPaceIndex,
+        guide: false
+      });
     });
 
     return { state: next, events: events };
@@ -159,7 +271,7 @@
 
   function settleBits(state) {
     var solvedIds = state.rows.filter(function (row) {
-      return row.mode === 'bits' && valueOf(row.bits) === row.value;
+      return row.mode === 'bits' && row.phase === 'play' && valueOf(row.bits) === row.value;
     }).map(function (row) {
       return row.id;
     });
@@ -167,10 +279,51 @@
     return awardClear(state, solvedIds);
   }
 
-  // rng is drawn twice when a row is created: once for the value, once for the mode.
+  function beginMiss(state, row, indexes, feedback) {
+    var retries = (row.retries || 0) + 1;
+    var misses = addMisses(state.misses, indexes);
+    if (retries >= 2) {
+      var revealedBits = row.mode === 'bits' ? bitsFor(row.value) : row.bits.slice();
+      var rows = state.rows.map(function (item) {
+        if (item.id !== row.id) return item;
+        return copyRow(item, {
+          bits: revealedBits,
+          phase: 'reveal',
+          retries: retries,
+          feedback: feedback,
+          wrongIndexes: indexes,
+          wrong: true,
+          draft: ''
+        });
+      });
+      return {
+        state: copyState(state, { rows: rows, misses: misses, streak: 0 }),
+        events: [{ type: 'reveal', rowId: row.id, feedback: feedback }],
+        result: 'reveal'
+      };
+    }
+    var teaching = state.rows.map(function (item) {
+      if (item.id !== row.id) return item;
+      return copyRow(item, {
+        bits: row.bits,
+        phase: 'teach',
+        retries: retries,
+        feedback: feedback,
+        wrongIndexes: indexes,
+        wrong: true
+      });
+    });
+    return {
+      state: copyState(state, { rows: teaching, misses: misses, streak: 0 }),
+      events: [{ type: 'teach', rowId: row.id, feedback: feedback }],
+      result: 'teach'
+    };
+  }
+
   function spawnRow(state, rng) {
     var random = rng || Math.random;
     if (state.status !== 'playing') return { state: state, events: [] };
+    if (state.guide && state.rows.length) return { state: state, events: [] };
     if (state.rows.length >= MAX_ROWS) {
       var highScore = Math.max(state.highScore, state.score);
       return {
@@ -181,14 +334,7 @@
     var config = levelConfig(state.level);
     var value = randomValue(config.maxValue, random, state.lastValue);
     var mode = random() < config.bitsBias ? 'bits' : 'decimal';
-    var row = {
-      id: state.nextId,
-      mode: mode,
-      value: value,
-      bits: mode === 'bits' ? BIT_VALUES.map(function () { return 0; }) : bitsFor(value),
-      draft: '',
-      wrong: false
-    };
+    var row = blankRow(state.nextId, mode, value);
     return {
       state: copyState(state, {
         rows: state.rows.concat(row),
@@ -199,24 +345,59 @@
     };
   }
 
+  function spawnGuide(state) {
+    var row = blankRow(state.nextId, 'bits', GUIDE_VALUE);
+    return {
+      state: copyState(state, {
+        rows: [row],
+        nextId: state.nextId + 1,
+        lastValue: GUIDE_VALUE,
+        guide: true,
+        level: 1,
+        paceIndex: 0
+      }),
+      events: [{ type: 'spawn', rowId: row.id, mode: 'bits', guide: true }]
+    };
+  }
+
   function startGame(previous, rng, options) {
-    var level = normalizeLevel(options && options.level);
+    var guide = !!(options && options.guide);
+    var level = guide ? 1 : normalizeLevel(options && options.level);
     var highScore = previous && previous.highScore ? previous.highScore : 0;
-    var fresh = copyState(createGame(highScore), { status: 'playing', level: level });
+    var misses = previous && previous.misses && previous.misses.length
+      ? previous.misses.slice()
+      : emptyMisses();
+    var paceIndex = paceIndexForLevel(level);
+    var carriedBest = previous && previous.bestPaceIndex ? previous.bestPaceIndex | 0 : 0;
+    var fresh = copyState(createGame(highScore), {
+      status: 'playing',
+      level: level,
+      paceIndex: paceIndex,
+      bestPaceIndex: Math.max(carriedBest, guide ? 0 : paceIndex),
+      misses: misses,
+      guide: guide
+    });
+    if (guide) return spawnGuide(fresh);
     return spawnRow(fresh, rng || Math.random);
   }
 
   function toggleBit(state, rowId, index) {
     if (state.status !== 'playing') return { state: state, events: [] };
     var current = findRow(state, rowId);
-    if (!current || current.mode !== 'bits') return { state: state, events: [] };
+    if (!current || current.mode !== 'bits' || current.phase !== 'play') {
+      return { state: state, events: [] };
+    }
     if (index < 0 || index >= BIT_VALUES.length) return { state: state, events: [] };
     var bits = current.bits.slice();
     bits[index] = bits[index] ? 0 : 1;
+    var updated = copyRow(current, { bits: bits, wrong: false, wrongIndexes: [] });
     var rows = state.rows.map(function (row) {
-      return row.id === rowId ? copyRow(row, { bits: bits }) : row;
+      return row.id === rowId ? updated : row;
     });
-    return settleBits(copyState(state, { rows: rows }));
+    var withBits = copyState(state, { rows: rows });
+    if (valueOf(bits) === current.value) return settleBits(withBits);
+    if (isBuilding(bits, current.value)) return { state: withBits, events: [] };
+    return beginMiss(withBits, updated, differingIndexes(bits, current.value), bitLesson(bits, current.value));
   }
 
   function setDraft(state, rowId, draft) {
@@ -224,7 +405,7 @@
     var clean = String(draft == null ? '' : draft).replace(/\D/g, '').slice(0, 3);
     var changed = false;
     var rows = state.rows.map(function (row) {
-      if (row.id !== rowId || row.mode !== 'decimal') return row;
+      if (row.id !== rowId || row.mode !== 'decimal' || row.phase !== 'play') return row;
       if (row.draft === clean && row.wrong === false) return row;
       changed = true;
       return copyRow(row, { draft: clean, wrong: false });
@@ -236,7 +417,9 @@
   function submitDecimal(state, rowId) {
     if (state.status !== 'playing') return { state: state, events: [], result: 'ignore' };
     var row = findRow(state, rowId);
-    if (!row || row.mode !== 'decimal') return { state: state, events: [], result: 'ignore' };
+    if (!row || row.mode !== 'decimal' || row.phase !== 'play') {
+      return { state: state, events: [], result: 'ignore' };
+    }
     if (row.draft === '') return { state: state, events: [], result: 'ignore' };
     var guessed = Number(row.draft);
     if (!Number.isInteger(guessed)) return { state: state, events: [], result: 'ignore' };
@@ -245,14 +428,54 @@
       cleared.result = 'correct';
       return cleared;
     }
-    var rows = state.rows.map(function (item) {
-      return item.id === rowId ? copyRow(item, { wrong: true }) : item;
-    });
-    return {
-      state: copyState(state, { rows: rows, streak: 0 }),
-      events: [{ type: 'wrong', rowId: rowId }],
-      result: 'wrong'
-    };
+    var indexes = bitsFor(row.value).reduce(function (list, bit, index) {
+      if (bit) list.push(index);
+      return list;
+    }, []);
+    var missed = beginMiss(state, row, indexes, decimalLesson(row.value));
+    missed.result = missed.result === 'reveal' ? 'reveal' : 'wrong';
+    return missed;
+  }
+
+  function releaseHold(state, rowId) {
+    var row = findRow(state, rowId);
+    if (!row) return { state: state, events: [] };
+    if (row.phase === 'teach') {
+      var rows = state.rows.map(function (item) {
+        if (item.id !== rowId) return item;
+        return copyRow(item, {
+          phase: 'play',
+          bits: item.mode === 'bits' ? BIT_VALUES.map(function () { return 0; }) : item.bits,
+          draft: '',
+          wrong: false,
+          wrongIndexes: item.mode === 'decimal' ? item.wrongIndexes : [],
+          feedback: item.feedback
+        });
+      });
+      return {
+        state: copyState(state, { rows: rows }),
+        events: [{ type: 'retry', rowId: rowId }]
+      };
+    }
+    if (row.phase === 'reveal') {
+      var remaining = state.rows.filter(function (item) { return item.id !== rowId; });
+      if (state.guide && !remaining.length) {
+        var again = blankRow(state.nextId, 'bits', GUIDE_VALUE);
+        return {
+          state: copyState(state, {
+            rows: [again],
+            nextId: state.nextId + 1,
+            lastValue: GUIDE_VALUE
+          }),
+          events: [{ type: 'retry', rowId: again.id }]
+        };
+      }
+      return {
+        state: copyState(state, { rows: remaining }),
+        events: [{ type: 'dismissed', rowId: rowId }]
+      };
+    }
+    return { state: state, events: [] };
   }
 
   function pauseGame(state) {
@@ -273,17 +496,26 @@
   }
 
   function copyRow(row, patch) {
+    var bits = patch.bits ? patch.bits.slice() : row.bits.slice();
+    var wrongIndexes = patch.wrongIndexes ? patch.wrongIndexes.slice() : (row.wrongIndexes || []).slice();
     return {
       id: row.id,
       mode: row.mode,
       value: row.value,
-      bits: patch.bits || row.bits,
+      bits: bits,
       draft: patch.draft != null ? patch.draft : row.draft,
-      wrong: patch.wrong != null ? patch.wrong : row.wrong
+      wrong: patch.wrong != null ? patch.wrong : row.wrong,
+      retries: patch.retries != null ? patch.retries : (row.retries || 0),
+      phase: patch.phase || row.phase || 'play',
+      feedback: patch.feedback != null ? patch.feedback : (row.feedback || ''),
+      wrongIndexes: wrongIndexes
     };
   }
 
   function copyState(state, patch) {
+    var misses = patch.misses
+      ? patch.misses.slice()
+      : (state.misses ? state.misses.slice() : emptyMisses());
     return {
       status: patch.status || state.status,
       rows: patch.rows || state.rows,
@@ -291,11 +523,16 @@
       streak: patch.streak != null ? patch.streak : state.streak,
       bestStreak: patch.bestStreak != null ? patch.bestStreak : state.bestStreak,
       level: patch.level != null ? patch.level : state.level,
-      solvedThisLevel: patch.solvedThisLevel != null ? patch.solvedThisLevel : state.solvedThisLevel,
+      paceIndex: patch.paceIndex != null ? patch.paceIndex : (state.paceIndex || 0),
+      cleanRows: patch.cleanRows != null ? patch.cleanRows : (state.cleanRows || 0),
+      solvedThisLevel: patch.solvedThisLevel != null ? patch.solvedThisLevel : (state.solvedThisLevel || 0),
       solved: patch.solved != null ? patch.solved : state.solved,
       highScore: patch.highScore != null ? patch.highScore : state.highScore,
+      bestPaceIndex: patch.bestPaceIndex != null ? patch.bestPaceIndex : (state.bestPaceIndex || 0),
       nextId: patch.nextId != null ? patch.nextId : state.nextId,
-      lastValue: patch.lastValue !== undefined ? patch.lastValue : state.lastValue
+      lastValue: patch.lastValue !== undefined ? patch.lastValue : state.lastValue,
+      misses: misses,
+      guide: patch.guide != null ? patch.guide : !!state.guide
     };
   }
 
@@ -303,6 +540,8 @@
     BIT_VALUES: BIT_VALUES,
     MAX_ROWS: MAX_ROWS,
     SOLVES_PER_LEVEL: SOLVES_PER_LEVEL,
+    CLEAN_ROWS_PER_PACE: CLEAN_ROWS_PER_PACE,
+    GUIDE_VALUE: GUIDE_VALUE,
     levelConfig: levelConfig,
     createGame: createGame,
     startGame: startGame,
@@ -310,11 +549,16 @@
     toggleBit: toggleBit,
     setDraft: setDraft,
     submitDecimal: submitDecimal,
+    releaseHold: releaseHold,
     pauseGame: pauseGame,
     resumeGame: resumeGame,
     bitsFor: bitsFor,
     valueOf: valueOf,
     expression: expression,
-    pointsFor: pointsFor
+    pointsFor: pointsFor,
+    partialPoints: partialPoints,
+    streakMultiplier: streakMultiplier,
+    paceName: paceName,
+    weakSpotText: weakSpotText
   };
 });

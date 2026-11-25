@@ -4,7 +4,17 @@
   var logic = window.BinaryLogic;
   if (!logic) return;
 
+  var GUIDE_KEY = 'gamify.binary.seenGuide';
+  var PROGRESS_KEY = 'gamify.binary.progress';
+  var HOLD_MS = 2000;
+  var CLEAR_MS = 450;
+  var MOMENT_MS = 1600;
+
+  var progress = readProgress();
   var state = logic.createGame(readBest());
+  if (progress.misses) state.misses = progress.misses;
+  if (progress.bestPaceIndex) state.bestPaceIndex = progress.bestPaceIndex;
+
   var selectedId = null;
   var coach = storageGet('gamify.binary.coach') === '1';
   var forceValues = storageGet('gamify.binary.forceValues') === '1';
@@ -13,8 +23,13 @@
   var clock = null;
   var frameId = 0;
   var toastTimer = 0;
+  var momentTimer = 0;
+  var momentOpen = false;
   var warnedFull = false;
   var audioCtx = null;
+  var holds = {};
+  var swallowClick = false;
+  var menuOpen = false;
 
   var coachBox = document.getElementById('coach');
   var valuesBox = document.getElementById('force-values');
@@ -37,6 +52,23 @@
       storageSet('gamify.muted', muted ? '1' : '0');
       renderMute();
     });
+    document.getElementById('menu-toggle').addEventListener('click', function () {
+      menuOpen = !menuOpen;
+      document.getElementById('menu-panel').hidden = !menuOpen;
+      this.setAttribute('aria-expanded', menuOpen ? 'true' : 'false');
+    });
+    document.getElementById('show-howto').addEventListener('click', function () {
+      var howto = document.getElementById('howto');
+      var open = howto.hidden;
+      howto.hidden = !open;
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        howto.scrollIntoView({
+          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          block: 'nearest'
+        });
+      }
+    });
     coachBox.addEventListener('change', function () {
       coach = coachBox.checked;
       storageSet('gamify.binary.coach', coach ? '1' : '0');
@@ -53,16 +85,19 @@
       }
     });
     document.getElementById('keypad').addEventListener('click', onKeypad);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('click', onSwallowClick, true);
     document.addEventListener('keydown', onKeydown);
     document.addEventListener('visibilitychange', onVisibility);
   }
 
   function onStart(event) {
     event.preventDefault();
-    var pace = document.querySelector('input[name="pace"]:checked');
+    clearHolds();
+    hideMoment();
     bestAtStart = state.highScore;
     var started = logic.startGame(state, Math.random, {
-      level: pace ? Number(pace.value) : 1
+      guide: storageGet(GUIDE_KEY) !== '1'
     });
     state = started.state;
     selectedId = state.rows.length ? state.rows[0].id : null;
@@ -70,10 +105,6 @@
     document.getElementById('board').replaceChildren();
     applyEvents(started.events);
     render();
-    startClock();
-    if (!logic.levelConfig(state.level).showValues && !forceValues) {
-      toast('Place values are hidden. You can pin them back on.');
-    }
   }
 
   function onPause() {
@@ -87,16 +118,17 @@
     if (state.status !== 'paused') return;
     state = logic.resumeGame(state).state;
     render();
-    releaseClock();
   }
 
   function onToggle(id, index) {
+    var wasGuide = state.guide;
     var previous = state;
     var result = logic.toggleBit(state, id, index);
     var solved = result.events.some(function (event) { return event.type === 'solved'; });
     state = result.state;
     if (!solved && state !== previous) soundToggle();
     applyEvents(result.events);
+    if (wasGuide && !state.guide && state.status === 'playing') spawnFollowUp();
     render();
     afterEvents(result.events);
   }
@@ -124,11 +156,13 @@
   function onDraftKeydown(event) {
     if (event.key !== 'Enter') return;
     event.preventDefault();
+    event.stopPropagation();
     onSubmit(Number(event.currentTarget.closest('.row').dataset.id));
   }
 
   function onRowClick(event) {
     if (state.status !== 'playing') return;
+    if (heldRows().length) return;
     var rowEl = event.currentTarget;
     selectedId = Number(rowEl.dataset.id);
     var bit = event.target.closest('[data-bit]');
@@ -144,11 +178,26 @@
   function onKeypad(event) {
     var key = event.target.closest('[data-key]');
     if (!key || state.status !== 'playing' || key.disabled) return;
+    if (heldRows().length) return;
     var name = key.dataset.key;
     if (name === 'enter') submitSelected();
     else if (name === 'clear') writeDraft('');
     else if (name === 'back') backspace();
     else appendDigit(name);
+  }
+
+  function onPointerDown(event) {
+    if (!heldRows().length || state.status !== 'playing') return;
+    if (event.target.closest && event.target.closest('#menu-panel, #menu-toggle')) return;
+    swallowClick = true;
+    releaseIfHeld();
+  }
+
+  function onSwallowClick(event) {
+    if (!swallowClick) return;
+    swallowClick = false;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function onKeydown(event) {
@@ -164,12 +213,17 @@
       onResume();
       return;
     }
+    if (state.status === 'playing' && heldRows().length) {
+      event.preventDefault();
+      releaseIfHeld();
+      return;
+    }
     if (state.status !== 'playing') return;
     if (!gameKeyContext(event.target)) return;
     if (event.target.matches && event.target.matches('input')) return;
 
     var row = selectedPlayable();
-    if (!row) return;
+    if (!row || row.phase !== 'play') return;
     if (row.mode === 'decimal' && /^[0-9]$/.test(key)) {
       event.preventDefault();
       selectedId = row.id;
@@ -201,12 +255,12 @@
   function onVisibility() {
     if (state.status !== 'playing') return;
     if (document.hidden) holdClock();
-    else releaseClock();
+    else syncSpawnClock();
   }
 
   function appendDigit(digit) {
     var row = decimalTarget();
-    if (!row) return;
+    if (!row || row.phase !== 'play') return;
     selectedId = row.id;
     state = logic.setDraft(state, row.id, row.draft + digit).state;
     render();
@@ -215,7 +269,7 @@
 
   function backspace() {
     var row = decimalTarget();
-    if (!row) return;
+    if (!row || row.phase !== 'play') return;
     selectedId = row.id;
     state = logic.setDraft(state, row.id, row.draft.slice(0, -1)).state;
     render();
@@ -224,7 +278,7 @@
 
   function writeDraft(value) {
     var row = decimalTarget();
-    if (!row) return;
+    if (!row || row.phase !== 'play') return;
     selectedId = row.id;
     state = logic.setDraft(state, row.id, value).state;
     render();
@@ -233,7 +287,7 @@
 
   function submitSelected() {
     var row = decimalTarget();
-    if (!row) return;
+    if (!row || row.phase !== 'play') return;
     selectedId = row.id;
     onSubmit(row.id);
   }
@@ -258,7 +312,7 @@
   }
 
   function focusNextDecimal() {
-    var next = state.rows.find(function (row) { return row.mode === 'decimal'; });
+    var next = state.rows.find(function (row) { return row.mode === 'decimal' && row.phase === 'play'; });
     if (!next) return;
     selectedId = next.id;
     paintSelection();
@@ -273,16 +327,21 @@
     syncRows();
     renderChrome();
     renderResults();
+    syncSpawnClock();
     paintMeter();
     maybeWarn();
   }
 
   function renderHud() {
     document.getElementById('score').textContent = formatNumber(state.score);
-    document.getElementById('level').textContent = String(state.level);
+    document.getElementById('pace').textContent = logic.paceName(state);
     document.getElementById('cleared').textContent = String(state.solved);
     document.getElementById('streak').textContent = String(state.streak);
     document.getElementById('best').textContent = formatNumber(state.highScore);
+    var mult = logic.streakMultiplier(state.streak);
+    var multNode = document.getElementById('mult');
+    multNode.textContent = '×' + mult;
+    multNode.classList.toggle('hot', state.streak > 1);
     var pips = document.getElementById('pips');
     if (pips.childElementCount !== logic.SOLVES_PER_LEVEL) {
       pips.replaceChildren();
@@ -328,20 +387,28 @@
         span.setAttribute('aria-hidden', 'true');
       }
     });
-    var eq = ruler.querySelector('.eq');
-    eq.dataset.hidden = show ? 'false' : 'true';
-    if (show) eq.removeAttribute('aria-hidden');
-    else eq.setAttribute('aria-hidden', 'true');
+    var eqNode = ruler.querySelector('.eq');
+    eqNode.dataset.hidden = show ? 'false' : 'true';
+    if (show) eqNode.removeAttribute('aria-hidden');
+    else eqNode.setAttribute('aria-hidden', 'true');
   }
 
   function syncRows() {
     var board = document.getElementById('board');
     var keep = new Set(state.rows.map(function (row) { return String(row.id); }));
     Array.prototype.forEach.call(Array.from(board.children), function (child) {
-      if (!keep.has(child.dataset.id)) child.remove();
+      if (keep.has(child.dataset.id) || child.classList.contains('clearing')) return;
+      child.classList.add('clearing');
+      window.setTimeout(function () {
+        if (child.parentNode) child.remove();
+        var empty = document.getElementById('empty');
+        if (empty && !document.querySelector('#board .row') && state.rows.length === 0) {
+          empty.hidden = false;
+        }
+      }, prefersReducedMotion() ? 0 : CLEAR_MS);
     });
     state.rows.forEach(function (row) {
-      var el = board.querySelector('[data-id="' + row.id + '"]');
+      var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
       if (el && el.dataset.mode !== row.mode) {
         el.remove();
         el = null;
@@ -353,7 +420,8 @@
       updateRow(el, row);
     });
     state.rows.forEach(function (row) {
-      board.appendChild(board.querySelector('[data-id="' + row.id + '"]'));
+      var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
+      if (el) board.appendChild(el);
     });
   }
 
@@ -397,24 +465,45 @@
       ticket.appendChild(input);
     }
     el.appendChild(ticket);
+    var lesson = document.createElement('p');
+    lesson.className = 'lesson';
+    lesson.hidden = true;
+    el.appendChild(lesson);
     el.addEventListener('click', onRowClick);
     return el;
   }
 
   function updateRow(el, row) {
+    var teaching = row.phase === 'teach' || row.phase === 'reveal';
     el.classList.toggle('selected', row.id === selectedId);
-    el.setAttribute('aria-label', row.mode === 'bits'
+    el.classList.toggle('teaching', teaching);
+    var label = row.mode === 'bits'
       ? 'Set the bits to equal ' + row.value
-      : 'Type the decimal value of these bits');
+      : 'Type the decimal value of these bits';
+    if (row.feedback && teaching) label = row.feedback;
+    el.setAttribute('aria-label', label);
     el.querySelectorAll('[data-bit]').forEach(function (button, index) {
       var on = row.bits[index] === 1;
+      var marked = row.wrongIndexes.indexOf(index) !== -1;
+      var showMark = marked && (teaching || (row.mode === 'decimal' && row.retries > 0));
+      var hint = state.guide && row.phase === 'play' && !on && (index === 4 || index === 6);
       button.textContent = on ? '1' : '0';
       button.classList.toggle('on', on);
       button.classList.toggle('locked', row.mode !== 'bits');
+      button.classList.toggle('miss', showMark);
+      button.classList.toggle('hint', hint);
       button.disabled = row.mode !== 'bits' || state.status !== 'playing';
       button.setAttribute('aria-pressed', on ? 'true' : 'false');
       button.setAttribute('aria-label', logic.BIT_VALUES[index] + (on ? ' on' : ' off'));
     });
+    var lesson = el.querySelector('.lesson');
+    if (row.feedback && (teaching || row.retries > 0)) {
+      lesson.hidden = false;
+      lesson.textContent = row.feedback;
+    } else {
+      lesson.hidden = true;
+      lesson.textContent = '';
+    }
     if (row.mode === 'bits') {
       el.querySelector('.target').textContent = String(row.value);
       var sum = el.querySelector('.sum');
@@ -429,10 +518,12 @@
       }
     } else {
       var input = el.querySelector('input');
-      if (document.activeElement !== input && input.value !== row.draft) input.value = row.draft;
-      input.classList.toggle('wrong', row.wrong);
-      input.disabled = state.status !== 'playing';
-      if (row.wrong) input.setAttribute('aria-invalid', 'true');
+      input.disabled = state.status !== 'playing' || row.phase !== 'play';
+      if (input.value !== row.draft && (document.activeElement !== input || input.disabled)) {
+        input.value = row.draft;
+      }
+      input.classList.toggle('wrong', row.wrong && teaching);
+      if (row.wrong && teaching) input.setAttribute('aria-invalid', 'true');
       else input.removeAttribute('aria-invalid');
     }
   }
@@ -450,12 +541,25 @@
     var nearlyFull = state.status === 'playing' && state.rows.length >= logic.MAX_ROWS - 1;
     playfield.classList.toggle('danger', nearlyFull);
     playfield.classList.toggle('full', state.status === 'playing' && state.rows.length >= logic.MAX_ROWS);
+    var guide = document.getElementById('guide');
+    var showGuide = !!(state.guide && (state.status === 'playing' || state.status === 'paused'));
+    guide.hidden = !showGuide;
+    if (showGuide) guide.textContent = 'Tap the 8 and the 2 to make 10.';
+    var best = document.getElementById('best-pace');
+    if (state.bestPaceIndex > 0) {
+      best.hidden = false;
+      best.textContent = 'Best pace: ' + logic.paceName(state.bestPaceIndex) + '.';
+    } else {
+      best.hidden = true;
+    }
     var empty = document.getElementById('empty');
-    empty.hidden = state.rows.length !== 0;
+    empty.hidden = state.rows.length !== 0 || !!document.querySelector('#board .row');
     if (state.status === 'playing') {
       empty.textContent = 'Column clear. The next row is on the way.';
     } else if (state.status === 'ready') {
-      empty.textContent = 'Place values sit above the columns. Press start and the first row appears.';
+      empty.textContent = storageGet(GUIDE_KEY) === '1'
+        ? 'Press start. The first row appears at the top of the column.'
+        : 'Press start. The first row shows you which bits to tap.';
     } else {
       empty.textContent = 'Column clear.';
     }
@@ -480,8 +584,15 @@
     heading.textContent = state.score > bestAtStart ? 'New best.' : 'The column filled.';
     var summary = document.createElement('p');
     summary.textContent = 'Score ' + formatNumber(state.score)
-      + '. Level ' + state.level
+      + '. ' + logic.paceName(state)
       + '. ' + state.solved + ' cleared. Best streak ' + state.bestStreak + '.';
+    var weakText = logic.weakSpotText(state.misses);
+    var weak = null;
+    if (weakText) {
+      weak = document.createElement('p');
+      weak.className = 'weak';
+      weak.textContent = weakText;
+    }
     var note = document.createElement('p');
     note.className = 'review-note';
     note.textContent = 'These rows were still open:';
@@ -492,11 +603,13 @@
       item.textContent = formatBits(row.value) + ' = ' + logic.expression(row.value) + ' = ' + row.value;
       list.appendChild(item);
     });
-    box.append(heading, summary, note, list);
+    if (weak) box.append(heading, summary, weak, note, list);
+    else box.append(heading, summary, note, list);
   }
 
   function pressureText() {
     if (state.status !== 'playing') return '';
+    if (state.guide) return 'One row. Tap the marked bits.';
     var open = logic.MAX_ROWS - state.rows.length;
     if (open <= 0) return 'Clear a row before the next one arrives.';
     if (open === 1) return 'One empty slot.';
@@ -505,13 +618,18 @@
 
   function applyEvents(events) {
     var gained = 0;
-    var levelEvent = null;
+    var multiplier = 1;
+    var paceEvent = null;
     events.forEach(function (event) {
-      if (event.type === 'solved') gained += event.gained;
-      if (event.type === 'level') levelEvent = event;
-      if (event.type === 'wrong') {
+      if (event.type === 'solved') {
+        gained += event.gained;
+        multiplier = event.multiplier || 1;
+      }
+      if (event.type === 'pace') paceEvent = event;
+      if (event.type === 'teach' || event.type === 'reveal') {
         soundWrong();
-        announce('Not that total.');
+        announce(event.feedback);
+        scheduleHold(event.rowId);
       }
       if (event.type === 'over') {
         soundOver();
@@ -520,24 +638,32 @@
       }
     });
     if (gained) {
-      if (levelEvent) soundLevel();
+      if (paceEvent) soundLevel();
       else soundClear();
-      flashGain(gained);
-      if (levelEvent) {
-        announce('Cleared. Score ' + formatNumber(state.score) + '. Level ' + levelEvent.level + '.');
-        toast(levelMessage(levelEvent.level));
-      } else {
-        announce('Cleared. Score ' + formatNumber(state.score) + '.');
+      flashGain(gained, multiplier);
+      if (paceEvent) announce('Cleared. ' + paceEvent.name + '.');
+      else announce('Cleared. Score ' + formatNumber(state.score) + '.');
+    }
+    if (paceEvent) {
+      showMoment(paceEvent.name);
+      if (!logic.levelConfig(paceEvent.level).showValues && !forceValues) {
+        toast('Place values are hidden. You can pin them back on.');
       }
     }
-    if (events.some(function (event) { return event.type === 'solved' || event.type === 'over'; })) {
+    if (events.some(function (event) {
+      return event.type === 'solved' || event.type === 'teach' || event.type === 'reveal' || event.type === 'over' || event.type === 'pace';
+    })) {
       persistBest();
+      persistProgress();
+    }
+    if (!state.guide && events.some(function (event) { return event.type === 'solved'; })) {
+      storageSet(GUIDE_KEY, '1');
     }
   }
 
   function afterEvents(events) {
     events.forEach(function (event) {
-      if (event.type !== 'wrong') return;
+      if (event.type !== 'teach' && event.type !== 'reveal') return;
       var node = document.querySelector('[data-id="' + event.rowId + '"]');
       if (!node) return;
       node.classList.remove('shake');
@@ -560,11 +686,100 @@
     if (state.rows.length < logic.MAX_ROWS) warnedFull = false;
   }
 
-  function levelMessage(level) {
-    var config = logic.levelConfig(level);
-    if (!config.showValues && !forceValues) return 'Level ' + level + '. Place values are hidden.';
-    if (config.maxValue >= 255) return 'Level ' + level + '. Full bytes.';
-    return 'Level ' + level + '. Numbers up to ' + config.maxValue + '.';
+  function spawnFollowUp() {
+    if (state.rows.length >= logic.MAX_ROWS) return;
+    var spawned = logic.spawnRow(state, Math.random);
+    state = spawned.state;
+    applyEvents(spawned.events);
+  }
+
+  function heldRows() {
+    return state.rows.filter(function (row) {
+      return row.phase === 'teach' || row.phase === 'reveal';
+    });
+  }
+
+  function scheduleHold(rowId) {
+    if (holds[rowId]) window.clearTimeout(holds[rowId]);
+    holds[rowId] = window.setTimeout(function () {
+      delete holds[rowId];
+      releaseRow(rowId);
+    }, HOLD_MS);
+  }
+
+  function releaseRow(rowId) {
+    if (holds[rowId]) {
+      window.clearTimeout(holds[rowId]);
+      delete holds[rowId];
+    }
+    var result = logic.releaseHold(state, rowId);
+    if (!result.events.length) return;
+    state = result.state;
+    render();
+    var released = findRow(rowId);
+    if (released && released.mode === 'decimal' && released.phase === 'play') focusInput(rowId);
+  }
+
+  function releaseIfHeld() {
+    var held = heldRows();
+    if (!held.length) return false;
+    var focusId = null;
+    held.forEach(function (row) {
+      if (holds[row.id]) {
+        window.clearTimeout(holds[row.id]);
+        delete holds[row.id];
+      }
+      var result = logic.releaseHold(state, row.id);
+      if (!result.events.length) return;
+      state = result.state;
+      var released = findRow(row.id);
+      if (released && released.mode === 'decimal' && released.phase === 'play') focusId = released.id;
+    });
+    render();
+    if (focusId) focusInput(focusId);
+    return true;
+  }
+
+  function clearHolds() {
+    Object.keys(holds).forEach(function (id) {
+      window.clearTimeout(holds[id]);
+      delete holds[id];
+    });
+  }
+
+  function showMoment(name) {
+    momentOpen = true;
+    document.getElementById('moment-name').textContent = name;
+    document.getElementById('moment').hidden = false;
+    if (momentTimer) window.clearTimeout(momentTimer);
+    momentTimer = window.setTimeout(function () {
+      momentTimer = 0;
+      momentOpen = false;
+      document.getElementById('moment').hidden = true;
+      if (state.status === 'playing') syncSpawnClock();
+    }, MOMENT_MS);
+  }
+
+  function hideMoment() {
+    if (momentTimer) window.clearTimeout(momentTimer);
+    momentTimer = 0;
+    momentOpen = false;
+    var node = document.getElementById('moment');
+    if (node) node.hidden = true;
+  }
+
+  function shouldFreezeSpawn() {
+    return !!(state.guide || momentOpen || heldRows().length);
+  }
+
+  function syncSpawnClock() {
+    if (state.status !== 'playing') return;
+    if (shouldFreezeSpawn()) {
+      if (clock && !clock.held) holdClock();
+      return;
+    }
+    if (!clock) startClock();
+    else if (clock.held) releaseClock();
   }
 
   function startClock(ms) {
@@ -612,7 +827,6 @@
     applyEvents(spawned.events);
     render();
     afterEvents(spawned.events);
-    if (state.status === 'playing') startClock();
   }
 
   function tickMeter() {
@@ -631,12 +845,18 @@
     meter.style.transform = 'scaleX(' + amount + ')';
   }
 
-  function flashGain(amount) {
+  function flashGain(amount, multiplier) {
     var gain = document.getElementById('gain');
-    gain.textContent = '+' + amount;
+    gain.textContent = multiplier > 1 ? '+' + amount + ' ×' + multiplier : '+' + amount;
     gain.classList.remove('pop');
     void gain.offsetWidth;
     gain.classList.add('pop');
+    var multNode = document.getElementById('mult');
+    if (multiplier > 1) {
+      multNode.classList.remove('pop');
+      void multNode.offsetWidth;
+      multNode.classList.add('pop');
+    }
     window.setTimeout(function () {
       gain.textContent = '';
       gain.classList.remove('pop');
@@ -706,10 +926,34 @@
     storageSet('gamify.binary.highScore', String(state.highScore));
   }
 
+  function persistProgress() {
+    storageSet(PROGRESS_KEY, JSON.stringify({
+      bestPaceIndex: state.bestPaceIndex || 0,
+      misses: state.misses
+    }));
+  }
+
   function readBest() {
     var raw = storageGet('gamify.binary.highScore');
     var number = Number(raw);
     return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
+  }
+
+  function readProgress() {
+    var empty = { bestPaceIndex: 0, misses: null };
+    try {
+      var parsed = JSON.parse(storageGet(PROGRESS_KEY) || 'null');
+      if (!parsed || typeof parsed !== 'object') return empty;
+      var misses = Array.isArray(parsed.misses) && parsed.misses.length === logic.BIT_VALUES.length
+        ? parsed.misses.map(function (n) { return Math.max(0, n | 0); })
+        : null;
+      return {
+        bestPaceIndex: Math.max(0, parsed.bestPaceIndex | 0),
+        misses: misses
+      };
+    } catch (error) {
+      return empty;
+    }
   }
 
   function storageGet(key) {
