@@ -399,16 +399,21 @@
       }
       if (!el) {
         el = buildRow(row);
-        var live = Array.prototype.filter.call(board.children, function (child) {
-          return !child.classList.contains('clearing');
-        });
-        if (live[index]) board.insertBefore(el, live[index]);
-        else board.appendChild(el);
+        placeAbove(board, el, row.id);
       }
-      // Newest row has the lowest order, so it appears above the rows already in play.
-      el.style.order = String(state.rows.length - index);
       updateRow(el, row);
     });
+  }
+
+  // Newest id goes first in the column, which puts it above the rows already there.
+  function placeAbove(board, el, rowId) {
+    var older = null;
+    Array.prototype.forEach.call(board.children, function (child) {
+      if (older || child.classList.contains('clearing') || child === el) return;
+      if (Number(child.dataset.id) < rowId) older = child;
+    });
+    if (older) board.insertBefore(el, older);
+    else board.appendChild(el);
   }
 
   function buildRow(row) {

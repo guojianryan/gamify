@@ -341,6 +341,7 @@ a.button.secondary {
   grid-template-columns: repeat(8, minmax(0, 1fr)) minmax(96px, 148px);
   gap: 6px;
   align-items: stretch;
+  animation: none;
 }
 
 .ruler {
