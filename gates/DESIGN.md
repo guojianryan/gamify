@@ -14,9 +14,9 @@ Why this shape: freeform wiring fights phones; a tree matches how Boolean expres
 
 Expressions are shown with the usual school forms: `AND`, `OR`, `NOT`, `XOR`, `NAND`, `NOR`, with brackets for precedence. Level 1 uses only AND / OR / NOT. Level 2 adds XOR / NAND / NOR and can mix them with the basics.
 
-A curated bank of puzzles (not random-only) so difficulty rises smoothly and a class period does not feel repetitive. Within each level, puzzles are tagged easy → medium → hard; the round draws from those bands in order, then reshuffles unseen ones.
+A curated bank of puzzles (not random-only) so difficulty rises smoothly and a class period does not feel repetitive. Every expression uses **3 or 4 gates** and **2 or 3 inputs**. Within each level, puzzles are tagged warm-up → medium → hard; the round draws from those bands in order, then reshuffles unseen ones.
 
-Inputs are always 2 or 3 letters (A, B, or A–C).
+Inputs are always 2 or 3 letters (A, B, or A–C). Single-gate drills are left out so students practise nesting from the first solve.
 
 ## Truth table and animation
 

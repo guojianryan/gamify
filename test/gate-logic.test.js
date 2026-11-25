@@ -169,11 +169,19 @@ test('Level 1 puzzles only use AND OR NOT; Level 2 may use the extras', () => {
     const ops = new Set();
     opsIn(puzzle.ast, ops);
     ops.forEach((op) => assert.ok(L.LEVEL1_GATES.includes(op), op + ' in level 1'));
-    assert.ok(puzzle.inputs.length >= 1 && puzzle.inputs.length <= 3);
+    assert.ok(puzzle.inputs.length >= 2 && puzzle.inputs.length <= 3);
   });
   const level2Ops = new Set();
   L.puzzlesForLevel(2).forEach((puzzle) => opsIn(puzzle.ast, level2Ops));
   assert.ok(level2Ops.has('XOR') || level2Ops.has('NAND') || level2Ops.has('NOR'));
+});
+
+test('every puzzle uses 3 or 4 gates and 2–3 inputs', () => {
+  L.PUZZLES.forEach((puzzle) => {
+    const gates = L.countGates(puzzle.ast);
+    assert.ok(gates >= 3 && gates <= 4, puzzle.id + ' has ' + gates + ' gates');
+    assert.ok(puzzle.inputs.length >= 2 && puzzle.inputs.length <= 3, puzzle.id + ' inputs');
+  });
 });
 
 test('hint names the outermost operator once', () => {
