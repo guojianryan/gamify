@@ -239,6 +239,9 @@
     }
 
     picker.hidden = false;
+    picker.scrollTop = 0;
+    // Keep the board tall enough that Level 2 options stay reachable on phones.
+    document.getElementById('circuit-board').classList.add('picking');
     var first = grid.querySelector('button');
     if (first) first.focus();
   }
@@ -254,6 +257,7 @@
   function closePicker() {
     pickerPath = null;
     document.getElementById('picker').hidden = true;
+    document.getElementById('circuit-board').classList.remove('picking');
   }
 
   function applyPlace(choice) {

@@ -14,17 +14,29 @@
   var GATE_H = 50;
   var NOT_W = 52;
   var NOT_H = 34;
-  var COL_GAP = 64;
+  var COL_GAP = 56;
   var ROW_GAP = 22;
-  var INPUT_PAD = 36;
+  var INPUT_PAD = 40;
   var OUT_PAD = 56;
   var PAD = 24;
   var PORT_R = 5.5;
+  var EMPTY_R = 7;
   var NS = 'http://www.w3.org/2000/svg';
 
   function gateSize(op) {
     if (op === 'NOT') return { w: NOT_W, h: NOT_H };
     return { w: GATE_W, h: GATE_H };
+  }
+
+  // Where wires must meet the drawn outline (local coords inside the gate group).
+  function gateAnchors(op, w, h) {
+    var curved = op === 'OR' || op === 'NOR' || op === 'XOR';
+    var bubble = op === 'NAND' || op === 'NOR' || op === 'NOT';
+    return {
+      inX: curved ? 10 : 1,
+      outX: bubble ? w - 0.5 : w - 1,
+      midY: h / 2
+    };
   }
 
   function arityOf(node, logic) {
@@ -90,12 +102,15 @@
     }
 
     if (op === 'AND' || op === 'NAND') {
+      // Arc so the nose actually reaches tipX (a cubic to the same end y never does).
       var tipX = op === 'NAND' ? w - 12 : w - 1;
-      // Classic D: flat left, curved right.
+      var flat = w * 0.34;
+      var rx = tipX - flat;
+      var ry = (h - 2) / 2;
       var andD = [
         'M 1,1',
-        'L ' + (w * 0.38) + ',1',
-        'C ' + tipX + ',1 ' + tipX + ',' + (h - 1) + ' ' + (w * 0.38) + ',' + (h - 1),
+        'L ' + flat + ',1',
+        'A ' + rx + ' ' + ry + ' 0 0 1 ' + flat + ',' + (h - 1),
         'L 1,' + (h - 1),
         'Z'
       ].join(' ');
@@ -110,10 +125,11 @@
 
     if (op === 'OR' || op === 'NOR' || op === 'XOR') {
       var tip = op === 'NOR' ? w - 12 : w - 1;
+      // Pointed tip at `tip`, concave back at x=10.
       var orD = [
         'M 10,1',
-        'Q ' + (w * 0.5) + ',1 ' + tip + ',' + mid,
-        'Q ' + (w * 0.5) + ',' + (h - 1) + ' 10,' + (h - 1),
+        'Q ' + (w * 0.55) + ',1 ' + tip + ',' + mid,
+        'Q ' + (w * 0.55) + ',' + (h - 1) + ' 10,' + (h - 1),
         'Q ' + (w * 0.28) + ',' + mid + ' 10,1',
         'Z'
       ].join(' ');
@@ -177,10 +193,8 @@
   }
 
   function place(node, path, outX, outY, topY, logic, signals, acc) {
-    var key = pathKey(path);
-
     if (!node) {
-      var emptyX = outX - 18;
+      var emptyX = outX - 20;
       acc.ports.push({
         kind: 'empty',
         path: path.slice(),
@@ -188,13 +202,13 @@
         y: outY,
         label: path.length ? 'Empty port' : 'Add gate or input'
       });
-      // stub wire into the parent / lamp
+      // Wire from the dashed circle rim all the way to the parent pin (outX).
       acc.wires.push({
-        segs: [{ x1: emptyX + PORT_R + 2, y1: outY, x2: outX, y2: outY }],
+        segs: [{ x1: emptyX + EMPTY_R, y1: outY, x2: outX, y2: outY }],
         signal: 'x',
         path: path.slice()
       });
-      return { x: emptyX, y: outY, left: emptyX - 8 };
+      return { connectX: emptyX + EMPTY_R, connectY: outY, left: emptyX - 8 };
     }
 
     if (node.type === 'input') {
@@ -219,18 +233,21 @@
         path: path.slice()
       });
       acc.dots.push({ x: inX, y: outY, signal: signalOf(signals, path) });
-      return { x: inX, y: outY, left: inX - 22 };
+      return { connectX: inX + PORT_R, connectY: outY, left: inX - 22 };
     }
 
-    // Gate
+    // Gate — anchors follow the drawn outline so wires do not float.
     var size = gateSize(node.op);
     var arity = arityOf(node, logic);
-    var bodyRight = outX - 10;
-    var bodyLeft = bodyRight - size.w;
+    var anchors = gateAnchors(node.op, size.w, size.h);
+    var tipX = outX; // parent asks this gate's output tip to sit at outX
+    var bodyLeft = tipX - anchors.outX;
     var bodyTop = outY - size.h / 2;
-    var pinYs = inputPinYs(arity, size.h).map(function (py) {
+    var pinYsLocal = inputPinYs(arity, size.h);
+    var pinYs = pinYsLocal.map(function (py) {
       return bodyTop + py;
     });
+    var pinX = bodyLeft + anchors.inX;
 
     acc.gates.push({
       op: node.op,
@@ -239,6 +256,8 @@
       y: bodyTop,
       w: size.w,
       h: size.h,
+      inX: anchors.inX,
+      outX: anchors.outX,
       signal: signalOf(signals, path)
     });
     acc.ports.push({
@@ -250,15 +269,7 @@
       h: size.h,
       label: node.op + ' gate'
     });
-
-    // short output stub from gate tip to outX
-    acc.wires.push({
-      segs: [{ x1: bodyRight, y1: outY, x2: outX, y2: outY }],
-      signal: signalOf(signals, path),
-      path: path.slice(),
-      role: 'out'
-    });
-    acc.dots.push({ x: bodyRight, y: outY, signal: signalOf(signals, path) });
+    acc.dots.push({ x: tipX, y: outY, signal: signalOf(signals, path) });
 
     var kids = node.inputs || [];
     var measures = kids.map(function (child) {
@@ -275,9 +286,11 @@
 
     kids.forEach(function (child, index) {
       var m = measures[index];
-      var childOutY = cursor + m.h / 2;
       var pinY = pinYs[index] != null ? pinYs[index] : outY;
-      var childOutX = bodyLeft - COL_GAP * 0.35;
+      // Leaves sit on the pin; nested gates keep their own vertical stack center.
+      var isLeaf = !child || child.type === 'input';
+      var childOutY = isLeaf ? pinY : cursor + m.h / 2;
+      var childOutX = pinX - COL_GAP * 0.45;
       var placed = place(
         child,
         path.concat(index),
@@ -290,17 +303,18 @@
       );
       if (placed.left < leftmost) leftmost = placed.left;
 
-      var segs = orthogonal(childOutX, childOutY, bodyLeft, pinY);
+      // Child ends at childOutX; this run meets the gate outline at pinX.
+      var segs = orthogonal(childOutX, childOutY, pinX, pinY);
       acc.wires.push({
         segs: segs,
         signal: signalOf(signals, path.concat(index)),
         path: path.concat(index)
       });
-      acc.dots.push({ x: bodyLeft, y: pinY, signal: signalOf(signals, path.concat(index)) });
+      acc.dots.push({ x: pinX, y: pinY, signal: signalOf(signals, path.concat(index)) });
       cursor += m.h + ROW_GAP;
     });
 
-    return { x: bodyLeft, y: outY, left: leftmost };
+    return { connectX: tipX, connectY: outY, left: leftmost };
   }
 
   function shiftAll(acc, dx) {
@@ -498,7 +512,7 @@
       if (port.kind === 'gate') return; // hit rect already on gate
       var btn = svgEl('circle', {
         cx: port.x, cy: port.y,
-        r: port.kind === 'empty' ? 7 : PORT_R,
+        r: port.kind === 'empty' ? EMPTY_R : PORT_R,
         class: port.kind === 'empty' ? 'sch-port empty' : 'sch-port',
         'data-port': '1',
         'data-path': pathKey(port.path),
