@@ -83,6 +83,7 @@
       render();
     });
     document.addEventListener('pointerdown', onPointerDown, true);
+    document.getElementById('keypad').addEventListener('pointerdown', onKeypadPointerDown);
     document.addEventListener('click', onSwallowClick, true);
     document.addEventListener('keydown', onKeydown);
     document.addEventListener('visibilitychange', onVisibility);
@@ -165,10 +166,27 @@
     input.classList.remove('wrong');
     input.removeAttribute('aria-invalid');
     if (row) paintRemainder(input.closest('.row'), row);
+    if (decimalReady(id)) onSubmit(id);
+  }
+
+  function onDraftBlur(event) {
+    var input = event.currentTarget;
+    var rowEl = input.closest('.row');
+    if (!rowEl) return;
+    var id = Number(rowEl.dataset.id);
+    state = logic.setDraft(state, id, input.value).state;
+    if (decimalReady(id)) onSubmit(id);
+    else syncKeypad();
+  }
+
+  function decimalReady(id) {
+    var row = findRow(id);
+    if (!row || row.mode !== 'decimal' || row.phase !== 'play' || row.draft === '') return false;
+    return Number(row.draft) === row.value;
   }
 
   function onDraftKeydown(event) {
-    if (event.key !== 'Enter') return;
+    if (event.key !== 'Enter' && event.key !== 'NumpadEnter') return;
     event.preventDefault();
     event.stopPropagation();
     onSubmit(Number(event.currentTarget.closest('.row').dataset.id));
@@ -232,6 +250,10 @@
       selectedId = row.id;
       var drafted = logic.setDraft(state, row.id, row.draft + key);
       state = drafted.state;
+      if (decimalReady(row.id)) {
+        onSubmit(row.id);
+        return;
+      }
       render();
       focusInput(row.id);
       return;
@@ -244,7 +266,7 @@
       focusInput(row.id);
       return;
     }
-    if (row.mode === 'decimal' && key === 'Enter') {
+    if (row.mode === 'decimal' && (key === 'Enter' || key === 'NumpadEnter')) {
       event.preventDefault();
       onSubmit(row.id);
       return;
@@ -272,9 +294,83 @@
     return state.rows[0] || null;
   }
 
+  function onKeypadPointerDown(event) {
+    event.preventDefault();
+    var key = event.target.closest('[data-key]');
+    if (!key) return;
+    var active = document.activeElement;
+    var rowEl = active && active.closest ? active.closest('#board .row') : null;
+    var id = rowEl ? Number(rowEl.dataset.id) : selectedId;
+    var row = findRow(id);
+    if (!row || row.mode !== 'decimal' || row.phase !== 'play' || state.status !== 'playing') return;
+    if (key.dataset.key === 'enter') {
+      onSubmit(id);
+      return;
+    }
+    var draft = row.draft || '';
+    if (key.dataset.key === 'back') draft = draft.slice(0, -1);
+    else if (draft.length < 3) draft += key.dataset.key;
+    state = logic.setDraft(state, id, draft).state;
+    var live = document.querySelector('.row[data-id="' + id + '"] input');
+    var drafted = findRow(id);
+    if (live && drafted) {
+      live.value = drafted.draft;
+      paintRemainder(live.closest('.row'), drafted);
+    }
+    if (decimalReady(id)) {
+      onSubmit(id);
+      return;
+    }
+    render();
+    focusInput(id);
+  }
+
+  function syncKeypad() {
+    var box = document.getElementById('keypad');
+    if (!box) return;
+    var active = document.activeElement;
+    var input = active && active.matches && active.matches('#board .row input') && !active.disabled ? active : null;
+    var rowEl = input ? input.closest('.row') : null;
+    var row = rowEl ? findRow(Number(rowEl.dataset.id)) : null;
+    var open = !!(row && row.mode === 'decimal' && row.phase === 'play' && state.status === 'playing');
+    box.hidden = !open;
+    document.body.classList.toggle('keypad-open', open);
+  }
+
+  function keepInputVisible(input) {
+    var pad = document.getElementById('keypad');
+    var padTop = pad && !pad.hidden ? pad.getBoundingClientRect().top : window.innerHeight;
+    var ruler = document.querySelector('.ruler');
+    var rowRect = input.getBoundingClientRect();
+    var bottom = ruler ? ruler.getBoundingClientRect().bottom : rowRect.bottom;
+    var margin = 12;
+    var room = padTop - margin * 2;
+    var delta = 0;
+    if (bottom - rowRect.top <= room) {
+      if (bottom > padTop - margin) delta = bottom - (padTop - margin);
+      else if (rowRect.top < margin) delta = rowRect.top - margin;
+    } else if (rowRect.bottom > padTop - margin) {
+      delta = rowRect.bottom - (padTop - margin);
+    } else if (rowRect.top < margin) {
+      delta = rowRect.top - margin;
+    }
+    if (!delta) return;
+    var root = document.documentElement;
+    var previous = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    window.scrollBy(0, delta);
+    root.style.scrollBehavior = previous;
+  }
+
   function focusInput(id) {
     var input = document.querySelector('.row[data-id="' + id + '"] input');
-    if (input) input.focus();
+    if (!input || input.disabled) return;
+    input.focus({ preventScroll: true });
+    syncKeypad();
+    keepInputVisible(input);
+    window.requestAnimationFrame(function () {
+      if (document.activeElement === input) keepInputVisible(input);
+    });
   }
 
   function focusNextDecimal() {
@@ -296,6 +392,7 @@
     syncSpawnClock();
     paintMeter();
     maybeWarn();
+    syncKeypad();
     if (pendingFocusId != null) {
       var focusId = pendingFocusId;
       pendingFocusId = null;
@@ -444,18 +541,20 @@
       left.hidden = true;
       var input = document.createElement('input');
       input.type = 'text';
-      input.inputMode = 'numeric';
-      input.enterKeyHint = 'done';
+      input.inputMode = 'none';
       input.maxLength = 3;
       input.autocomplete = 'off';
       input.spellcheck = false;
       input.placeholder = '?';
       input.setAttribute('aria-label', 'Decimal value');
       input.addEventListener('input', onDraftInput);
+      input.addEventListener('blur', onDraftBlur);
       input.addEventListener('keydown', onDraftKeydown);
       input.addEventListener('focus', function () {
         selectedId = Number(el.dataset.id);
         paintSelection();
+        syncKeypad();
+        keepInputVisible(input);
       });
       ticket.append(input, left);
     }
@@ -506,9 +605,8 @@
       var input = el.querySelector('input');
       paintRemainder(el, row);
       input.disabled = state.status !== 'playing' || row.phase !== 'play';
-      if (input.value !== row.draft && (document.activeElement !== input || input.disabled)) {
-        input.value = row.draft;
-      }
+      var typed = input.value.replace(/\D/g, '').slice(0, 3);
+      if (typed !== row.draft) input.value = row.draft;
       input.classList.toggle('wrong', row.wrong && teaching);
       if (row.wrong && teaching) input.setAttribute('aria-invalid', 'true');
       else input.removeAttribute('aria-invalid');
