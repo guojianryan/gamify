@@ -1145,18 +1145,9 @@
     }
     var note = el.querySelector('.left');
     if (!note) return;
-    var typed = row.draft === '' ? null : Number(row.draft);
-    if (typed == null || !Number.isInteger(typed)) {
-      note.hidden = true;
-      note.textContent = '';
-      note.classList.remove('over', 'exact');
-      return;
-    }
-    var gap = logic.remaining(row.value, typed);
-    note.hidden = false;
-    note.textContent = leftLabel(gap);
-    note.classList.toggle('over', gap < 0);
-    note.classList.toggle('exact', gap === 0);
+    note.hidden = true;
+    note.textContent = '';
+    note.classList.remove('over', 'exact');
   }
 
   function leftLabel(left) {
