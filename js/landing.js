@@ -55,7 +55,11 @@
 
   var bestLine = document.getElementById('landing-best');
   try {
-    var best = Number(localStorage.getItem('gamify.binary.highScore'));
+    var saved = JSON.parse(localStorage.getItem('gamify.binary.progress') || 'null');
+    var scores = saved && saved.highScores ? saved.highScores : null;
+    var best = scores
+      ? Math.max(Number(scores[60]) || 0, Number(scores[120]) || 0, Number(scores[300]) || 0)
+      : Number(localStorage.getItem('gamify.binary.highScore'));
     if (bestLine && Number.isFinite(best) && best > 0) {
       bestLine.hidden = false;
       bestLine.textContent = 'Best score on this browser: ' + best.toLocaleString('en-US') + '.';

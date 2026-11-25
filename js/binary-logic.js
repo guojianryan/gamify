@@ -14,72 +14,105 @@
 
   var BIT_VALUES = Object.freeze([128, 64, 32, 16, 8, 4, 2, 1]);
   var MAX_ROWS = 6;
-  var SOLVES_PER_LEVEL = 8;
-  var CLEAN_ROWS_PER_PACE = 8;
+  var WARMUP_ROWS = 8;
+  var WARMUP_SPAWN_MS = 8000;
   var SPAWN_FLOOR_MS = 1600;
+  var SPAWN_CEILING_MS = 8000;
+  var SPAWN_WINDOW = 5;
   var GUIDE_VALUE = 10;
-  var PACES = [
-    { id: 'warmup', name: 'Warm-up', level: 1 },
-    { id: 'drill', name: 'Drill', level: 3 },
-    { id: 'exam', name: 'Exam pace', level: 5 }
-  ];
+  var TIME_LIMITS = Object.freeze([60, 120, 300]);
+  var FAST_MS = 2000;
+  var SLOW_MS = 10000;
+  var POINTS_MAX = 100;
+  var POINTS_MIN = 20;
+  var DEFAULT_SOLVE_MS = 5000;
+  var BYTE_MAX = 255;
+  var BITS_BIAS = 0.5;
 
-  function normalizeLevel(level) {
-    var n = level | 0;
-    if (n < 1) return 1;
-    if (n > 30) return 30;
-    return n;
+  function emptyHighScores() {
+    return { 60: 0, 120: 0, 300: 0 };
   }
 
-  // Every pace draws uniformly from 0..255, and setting bits is as common as
-  // reading them. Hardness is the clock and, at Exam pace, hidden place values.
-  function levelConfig(level) {
-    var n = normalizeLevel(level);
-    var spawnMs = Math.max(SPAWN_FLOOR_MS, 4200 - (n - 1) * 550);
-    return {
-      level: n,
-      bits: BIT_VALUES.length,
-      maxValue: 255,
-      bitsBias: 0.5,
-      showValues: n < 5,
-      spawnMs: spawnMs
-    };
+  function copyHighScores(scores) {
+    var next = emptyHighScores();
+    TIME_LIMITS.forEach(function (limit) {
+      var value = scores && scores[limit] != null ? scores[limit] : 0;
+      var n = Number(value);
+      next[limit] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    });
+    return next;
+  }
+
+  function limitLabel(sec) {
+    if (sec === 60) return '1 minute';
+    if (sec === 120) return '2 minutes';
+    if (sec === 300) return '5 minutes';
+    return '';
+  }
+
+  // Shorter clears are worth more. Two seconds or less is full marks.
+  // Ten seconds or more is the floor. Anything between slides linearly.
+  function pointsForTime(ms) {
+    var t = typeof ms === 'number' && ms >= 0 ? ms : DEFAULT_SOLVE_MS;
+    if (t <= FAST_MS) return POINTS_MAX;
+    if (t >= SLOW_MS) return POINTS_MIN;
+    var ratio = (t - FAST_MS) / (SLOW_MS - FAST_MS);
+    return Math.round(POINTS_MAX - ratio * (POINTS_MAX - POINTS_MIN));
+  }
+
+  function partialForTime(ms) {
+    return Math.max(10, Math.round(pointsForTime(ms) / 2));
+  }
+
+  function delayFromTimes(times) {
+    if (!times || !times.length) return WARMUP_SPAWN_MS;
+    var recent = times.slice(-SPAWN_WINDOW);
+    var sum = 0;
+    for (var i = 0; i < recent.length; i += 1) sum += recent[i];
+    var target = Math.round((sum / recent.length) * 0.85);
+    if (target < SPAWN_FLOOR_MS) return SPAWN_FLOOR_MS;
+    if (target > SPAWN_CEILING_MS) return SPAWN_CEILING_MS;
+    return target;
+  }
+
+  // Warm-up is a fixed slow drip. After that, the next row arrives a little
+  // sooner than the recent clears, so a fast run tightens the column.
+  function spawnDelay(state) {
+    if (!state || !state.racing) return WARMUP_SPAWN_MS;
+    return delayFromTimes(state.solveTimes);
   }
 
   function emptyMisses() {
     return BIT_VALUES.map(function () { return 0; });
   }
 
-  function paceIndexForLevel(level) {
-    if (level >= 5) return 2;
-    if (level >= 3) return 1;
-    return 0;
-  }
-
-  function paceName(stateOrIndex) {
-    var index = typeof stateOrIndex === 'number'
-      ? stateOrIndex
-      : (stateOrIndex && stateOrIndex.paceIndex) || 0;
-    if (index < 0) index = 0;
-    if (index >= PACES.length) index = PACES.length - 1;
-    return PACES[index].name;
-  }
-
-  function createGame(highScore) {
-    var best = Number(highScore);
+  function createGame(saved) {
+    var legacy = 0;
+    var highScores = emptyHighScores();
+    if (typeof saved === 'number') {
+      legacy = Number.isFinite(saved) && saved > 0 ? Math.floor(saved) : 0;
+    } else if (saved && typeof saved === 'object') {
+      highScores = copyHighScores(saved.highScores || saved);
+      var carried = Number(saved.highScore);
+      if (Number.isFinite(carried) && carried > 0) legacy = Math.floor(carried);
+    }
     return {
       status: 'ready',
       rows: [],
       score: 0,
       streak: 0,
       bestStreak: 0,
-      level: 1,
-      paceIndex: 0,
       cleanRows: 0,
-      solvedThisLevel: 0,
       solved: 0,
-      highScore: Number.isFinite(best) && best > 0 ? Math.floor(best) : 0,
-      bestPaceIndex: 0,
+      highScore: legacy,
+      highScores: highScores,
+      racing: false,
+      choosing: false,
+      limitSec: 0,
+      remainingMs: 0,
+      solveTimes: [],
+      endedBy: '',
+      pauseStarted: null,
       nextId: 1,
       lastValue: null,
       misses: emptyMisses(),
@@ -112,16 +145,6 @@
     var n = streak | 0;
     if (n < 1) return 1;
     return Math.min(n, 5);
-  }
-
-  function pointsFor(level, streak) {
-    var safeLevel = normalizeLevel(level);
-    var safeStreak = Math.max(0, streak | 0);
-    return 50 + safeLevel * 10 + Math.min(safeStreak, 10) * 5;
-  }
-
-  function partialPoints(level) {
-    return Math.max(10, Math.round(pointsFor(level, 1) / 2));
   }
 
   function differingIndexes(bits, value) {
@@ -186,7 +209,7 @@
     return value;
   }
 
-  function blankRow(id, mode, value) {
+  function blankRow(id, mode, value, now) {
     return {
       id: id,
       mode: mode,
@@ -197,11 +220,30 @@
       retries: 0,
       phase: 'play',
       feedback: '',
-      wrongIndexes: []
+      wrongIndexes: [],
+      spawnedAt: typeof now === 'number' ? now : null,
+      heldMs: 0,
+      holdStarted: null
     };
   }
 
-  function awardClear(state, ids) {
+  function elapsedMs(row, state, now) {
+    if (!row || typeof now !== 'number' || typeof row.spawnedAt !== 'number') return null;
+    var held = row.heldMs || 0;
+    if (typeof row.holdStarted === 'number') held += Math.max(0, now - row.holdStarted);
+    if (state && typeof state.pauseStarted === 'number') held += Math.max(0, now - state.pauseStarted);
+    return Math.max(0, now - row.spawnedAt - held);
+  }
+
+  function bumpHigh(state) {
+    var scores = copyHighScores(state.highScores);
+    var limit = state.limitSec | 0;
+    if (!state.racing || !scores.hasOwnProperty(limit)) return scores;
+    scores[limit] = Math.max(scores[limit] || 0, state.score | 0);
+    return scores;
+  }
+
+  function awardClear(state, ids, now) {
     var events = [];
     var kept = state.rows.filter(function (row) {
       return ids.indexOf(row.id) === -1;
@@ -211,66 +253,67 @@
     ids.forEach(function (id) {
       var source = findRow(state, id);
       var partial = !!(source && source.retries > 0);
+      var elapsed = elapsedMs(source, state, now);
       var streak = partial ? next.streak : next.streak + 1;
-      var gained = partial ? partialPoints(next.level) : pointsFor(next.level, streak);
+      var gained = partial ? partialForTime(elapsed) : pointsForTime(elapsed);
       var score = next.score + gained;
-      var level = next.level;
-      var paceIndex = next.paceIndex || 0;
       var cleanRows = next.cleanRows || 0;
-      var paced = false;
+      var times = (next.solveTimes || []).slice();
+      if (typeof elapsed === 'number') times.push(elapsed);
+      var choosing = false;
       if (!partial) {
         cleanRows += 1;
-        if (cleanRows >= CLEAN_ROWS_PER_PACE) {
-          if (paceIndex < PACES.length - 1) {
-            paceIndex += 1;
-            level = PACES[paceIndex].level;
-            paced = true;
-          }
-          cleanRows = 0;
+        if (!next.racing && cleanRows >= WARMUP_ROWS) choosing = true;
+      }
+      var highScores = next.highScores;
+      var highScore = next.highScore;
+      if (next.racing) {
+        highScores = copyHighScores(next.highScores);
+        var limit = next.limitSec | 0;
+        if (highScores.hasOwnProperty(limit)) {
+          highScores[limit] = Math.max(highScores[limit] || 0, score);
+          highScore = highScores[limit];
         }
       }
-      var highScore = Math.max(next.highScore, score);
-      var bestPaceIndex = Math.max(next.bestPaceIndex || 0, paceIndex);
       events.push({
         type: 'solved',
         rowId: id,
         gained: gained,
         score: score,
         partial: partial,
+        elapsed: elapsed,
         multiplier: streakMultiplier(streak)
       });
-      if (paced) {
-        events.push({ type: 'pace', name: PACES[paceIndex].name, level: level, paceIndex: paceIndex });
-      }
+      if (choosing) events.push({ type: 'choose' });
       next = copyState(next, {
         score: score,
         streak: streak,
         bestStreak: Math.max(next.bestStreak, streak),
-        level: level,
-        paceIndex: paceIndex,
         cleanRows: cleanRows,
-        solvedThisLevel: cleanRows,
         solved: next.solved + 1,
         highScore: highScore,
-        bestPaceIndex: bestPaceIndex,
-        guide: false
+        highScores: highScores,
+        solveTimes: times,
+        guide: false,
+        choosing: choosing || next.choosing,
+        status: choosing ? 'choose' : next.status
       });
     });
 
     return { state: next, events: events };
   }
 
-  function settleBits(state) {
+  function settleBits(state, now) {
     var solvedIds = state.rows.filter(function (row) {
       return row.mode === 'bits' && row.phase === 'play' && valueOf(row.bits) === row.value;
     }).map(function (row) {
       return row.id;
     });
     if (!solvedIds.length) return { state: state, events: [] };
-    return awardClear(state, solvedIds);
+    return awardClear(state, solvedIds, now);
   }
 
-  function beginMiss(state, row, indexes, feedback) {
+  function beginMiss(state, row, indexes, feedback, now) {
     var retries = (row.retries || 0) + 1;
     var misses = addMisses(state.misses, indexes);
     if (retries >= 2) {
@@ -284,7 +327,8 @@
           feedback: feedback,
           wrongIndexes: indexes,
           wrong: true,
-          draft: ''
+          draft: '',
+          holdStarted: typeof now === 'number' ? now : null
         });
       });
       return {
@@ -301,7 +345,8 @@
         retries: retries,
         feedback: feedback,
         wrongIndexes: indexes,
-        wrong: true
+        wrong: true,
+        holdStarted: typeof now === 'number' ? now : null
       });
     });
     return {
@@ -311,23 +356,28 @@
     };
   }
 
-  function spawnRow(state, rng) {
+  function spawnRow(state, rng, now) {
     var random = rng || Math.random;
     if (state.status !== 'playing') return { state: state, events: [] };
     if (state.guide && state.rows.length) return { state: state, events: [] };
     if (state.rows.length >= MAX_ROWS) {
-      var highScore = Math.max(state.highScore, state.score);
+      var highScores = state.racing ? bumpHigh(state) : copyHighScores(state.highScores);
+      var highScore = state.racing ? (highScores[state.limitSec] || state.score) : state.highScore;
       return {
-        state: copyState(state, { status: 'over', highScore: highScore }),
-        events: [{ type: 'over', score: state.score, highScore: highScore }]
+        state: copyState(state, {
+          status: 'over',
+          endedBy: 'column',
+          highScores: highScores,
+          highScore: highScore
+        }),
+        events: [{ type: 'over', score: state.score, highScore: highScore, endedBy: 'column' }]
       };
     }
-    var config = levelConfig(state.level);
-    var value = randomValue(config.maxValue, random, state.lastValue);
-    var mode = random() < config.bitsBias ? 'bits' : 'decimal';
+    var value = randomValue(BYTE_MAX, random, state.lastValue);
+    var mode = random() < BITS_BIAS ? 'bits' : 'decimal';
     // An all-zero bit row would already equal 0, so that draw is typed instead.
     if (mode === 'bits' && value === 0) mode = 'decimal';
-    var row = blankRow(state.nextId, mode, value);
+    var row = blankRow(state.nextId, mode, value, now);
     return {
       state: copyState(state, {
         rows: state.rows.concat(row),
@@ -338,16 +388,14 @@
     };
   }
 
-  function spawnGuide(state) {
-    var row = blankRow(state.nextId, 'bits', GUIDE_VALUE);
+  function spawnGuide(state, now) {
+    var row = blankRow(state.nextId, 'bits', GUIDE_VALUE, now);
     return {
       state: copyState(state, {
         rows: [row],
         nextId: state.nextId + 1,
         lastValue: GUIDE_VALUE,
-        guide: true,
-        level: 1,
-        paceIndex: 0
+        guide: true
       }),
       events: [{ type: 'spawn', rowId: row.id, mode: 'bits', guide: true }]
     };
@@ -355,26 +403,61 @@
 
   function startGame(previous, rng, options) {
     var guide = !!(options && options.guide);
-    var level = guide ? 1 : normalizeLevel(options && options.level);
-    var highScore = previous && previous.highScore ? previous.highScore : 0;
+    var now = options && typeof options.now === 'number' ? options.now : undefined;
     var misses = previous && previous.misses && previous.misses.length
       ? previous.misses.slice()
       : emptyMisses();
-    var paceIndex = paceIndexForLevel(level);
-    var carriedBest = previous && previous.bestPaceIndex ? previous.bestPaceIndex | 0 : 0;
-    var fresh = copyState(createGame(highScore), {
+    var fresh = copyState(createGame({
+      highScore: previous && previous.highScore ? previous.highScore : 0,
+      highScores: previous && previous.highScores
+    }), {
       status: 'playing',
-      level: level,
-      paceIndex: paceIndex,
-      bestPaceIndex: Math.max(carriedBest, guide ? 0 : paceIndex),
       misses: misses,
       guide: guide
     });
-    if (guide) return spawnGuide(fresh);
-    return spawnRow(fresh, rng || Math.random);
+    if (guide) return spawnGuide(fresh, now);
+    return spawnRow(fresh, rng || Math.random, now);
   }
 
-  function toggleBit(state, rowId, index) {
+  function beginRace(state, limitSec, rng, now) {
+    var limit = limitSec | 0;
+    if (TIME_LIMITS.indexOf(limit) < 0) return { state: state, events: [] };
+    if (state.status !== 'choose') return { state: state, events: [] };
+    var fresh = copyState(state, {
+      status: 'playing',
+      racing: true,
+      choosing: false,
+      limitSec: limit,
+      remainingMs: limit * 1000,
+      score: 0,
+      streak: 0,
+      bestStreak: 0,
+      solved: 0,
+      rows: [],
+      guide: false,
+      endedBy: ''
+    });
+    var spawned = spawnRow(fresh, rng || Math.random, now);
+    spawned.events.unshift({ type: 'race', limitSec: limit });
+    return spawned;
+  }
+
+  function finishRace(state) {
+    if (!state.racing || state.status !== 'playing') return { state: state, events: [] };
+    var highScores = bumpHigh(state);
+    return {
+      state: copyState(state, {
+        status: 'over',
+        endedBy: 'time',
+        remainingMs: 0,
+        highScores: highScores,
+        highScore: highScores[state.limitSec] || state.score
+      }),
+      events: [{ type: 'over', score: state.score, endedBy: 'time' }]
+    };
+  }
+
+  function toggleBit(state, rowId, index, now) {
     if (state.status !== 'playing') return { state: state, events: [] };
     var current = findRow(state, rowId);
     if (!current || current.mode !== 'bits' || current.phase !== 'play') {
@@ -388,9 +471,9 @@
       return row.id === rowId ? updated : row;
     });
     var withBits = copyState(state, { rows: rows });
-    if (valueOf(bits) === current.value) return settleBits(withBits);
+    if (valueOf(bits) === current.value) return settleBits(withBits, now);
     if (isBuilding(bits, current.value)) return { state: withBits, events: [] };
-    return beginMiss(withBits, updated, differingIndexes(bits, current.value), bitLesson(bits, current.value));
+    return beginMiss(withBits, updated, differingIndexes(bits, current.value), bitLesson(bits, current.value), now);
   }
 
   function setDraft(state, rowId, draft) {
@@ -407,7 +490,7 @@
     return { state: copyState(state, { rows: rows }), events: [] };
   }
 
-  function submitDecimal(state, rowId) {
+  function submitDecimal(state, rowId, now) {
     if (state.status !== 'playing') return { state: state, events: [], result: 'ignore' };
     var row = findRow(state, rowId);
     if (!row || row.mode !== 'decimal' || row.phase !== 'play') {
@@ -417,7 +500,7 @@
     var guessed = Number(row.draft);
     if (!Number.isInteger(guessed)) return { state: state, events: [], result: 'ignore' };
     if (guessed === row.value) {
-      var cleared = awardClear(state, [rowId]);
+      var cleared = awardClear(state, [rowId], now);
       cleared.result = 'correct';
       return cleared;
     }
@@ -425,24 +508,30 @@
       if (bit) list.push(index);
       return list;
     }, []);
-    var missed = beginMiss(state, row, indexes, decimalLesson(row.value));
+    var missed = beginMiss(state, row, indexes, decimalLesson(row.value), now);
     missed.result = missed.result === 'reveal' ? 'reveal' : 'wrong';
     return missed;
   }
 
-  function releaseHold(state, rowId) {
+  function releaseHold(state, rowId, now) {
     var row = findRow(state, rowId);
     if (!row) return { state: state, events: [] };
     if (row.phase === 'teach') {
       var rows = state.rows.map(function (item) {
         if (item.id !== rowId) return item;
+        var heldMs = item.heldMs || 0;
+        if (typeof now === 'number' && typeof item.holdStarted === 'number') {
+          heldMs += Math.max(0, now - item.holdStarted);
+        }
         return copyRow(item, {
           phase: 'play',
           bits: item.mode === 'bits' ? BIT_VALUES.map(function () { return 0; }) : item.bits,
           draft: '',
           wrong: false,
           wrongIndexes: item.mode === 'decimal' ? item.wrongIndexes : [],
-          feedback: item.feedback
+          feedback: item.feedback,
+          heldMs: heldMs,
+          holdStarted: null
         });
       });
       return {
@@ -453,7 +542,7 @@
     if (row.phase === 'reveal') {
       var remaining = state.rows.filter(function (item) { return item.id !== rowId; });
       if (state.guide && !remaining.length) {
-        var again = blankRow(state.nextId, 'bits', GUIDE_VALUE);
+        var again = blankRow(state.nextId, 'bits', GUIDE_VALUE, now);
         return {
           state: copyState(state, {
             rows: [again],
@@ -471,14 +560,31 @@
     return { state: state, events: [] };
   }
 
-  function pauseGame(state) {
+  function pauseGame(state, now) {
     if (state.status !== 'playing') return { state: state, events: [] };
-    return { state: copyState(state, { status: 'paused' }), events: [{ type: 'paused' }] };
+    return {
+      state: copyState(state, {
+        status: 'paused',
+        pauseStarted: typeof now === 'number' ? now : null
+      }),
+      events: [{ type: 'paused' }]
+    };
   }
 
-  function resumeGame(state) {
+  function resumeGame(state, now) {
     if (state.status !== 'paused') return { state: state, events: [] };
-    return { state: copyState(state, { status: 'playing' }), events: [{ type: 'resumed' }] };
+    var delta = typeof now === 'number' && typeof state.pauseStarted === 'number'
+      ? Math.max(0, now - state.pauseStarted)
+      : 0;
+    var rows = delta
+      ? state.rows.map(function (row) {
+        return copyRow(row, { heldMs: (row.heldMs || 0) + delta });
+      })
+      : state.rows;
+    return {
+      state: copyState(state, { status: 'playing', rows: rows, pauseStarted: null }),
+      events: [{ type: 'resumed' }]
+    };
   }
 
   function findRow(state, rowId) {
@@ -501,7 +607,10 @@
       retries: patch.retries != null ? patch.retries : (row.retries || 0),
       phase: patch.phase || row.phase || 'play',
       feedback: patch.feedback != null ? patch.feedback : (row.feedback || ''),
-      wrongIndexes: wrongIndexes
+      wrongIndexes: wrongIndexes,
+      spawnedAt: patch.spawnedAt !== undefined ? patch.spawnedAt : (row.spawnedAt != null ? row.spawnedAt : null),
+      heldMs: patch.heldMs != null ? patch.heldMs : (row.heldMs || 0),
+      holdStarted: patch.holdStarted !== undefined ? patch.holdStarted : (row.holdStarted != null ? row.holdStarted : null)
     };
   }
 
@@ -515,13 +624,17 @@
       score: patch.score != null ? patch.score : state.score,
       streak: patch.streak != null ? patch.streak : state.streak,
       bestStreak: patch.bestStreak != null ? patch.bestStreak : state.bestStreak,
-      level: patch.level != null ? patch.level : state.level,
-      paceIndex: patch.paceIndex != null ? patch.paceIndex : (state.paceIndex || 0),
       cleanRows: patch.cleanRows != null ? patch.cleanRows : (state.cleanRows || 0),
-      solvedThisLevel: patch.solvedThisLevel != null ? patch.solvedThisLevel : (state.solvedThisLevel || 0),
       solved: patch.solved != null ? patch.solved : state.solved,
       highScore: patch.highScore != null ? patch.highScore : state.highScore,
-      bestPaceIndex: patch.bestPaceIndex != null ? patch.bestPaceIndex : (state.bestPaceIndex || 0),
+      highScores: patch.highScores ? copyHighScores(patch.highScores) : copyHighScores(state.highScores),
+      racing: patch.racing != null ? patch.racing : !!state.racing,
+      choosing: patch.choosing != null ? patch.choosing : !!state.choosing,
+      limitSec: patch.limitSec != null ? patch.limitSec : (state.limitSec || 0),
+      remainingMs: patch.remainingMs != null ? patch.remainingMs : (state.remainingMs || 0),
+      solveTimes: patch.solveTimes ? patch.solveTimes.slice() : (state.solveTimes ? state.solveTimes.slice() : []),
+      endedBy: patch.endedBy != null ? patch.endedBy : (state.endedBy || ''),
+      pauseStarted: patch.pauseStarted !== undefined ? patch.pauseStarted : (state.pauseStarted != null ? state.pauseStarted : null),
       nextId: patch.nextId != null ? patch.nextId : state.nextId,
       lastValue: patch.lastValue !== undefined ? patch.lastValue : state.lastValue,
       misses: misses,
@@ -532,13 +645,16 @@
   return {
     BIT_VALUES: BIT_VALUES,
     MAX_ROWS: MAX_ROWS,
-    SOLVES_PER_LEVEL: SOLVES_PER_LEVEL,
-    CLEAN_ROWS_PER_PACE: CLEAN_ROWS_PER_PACE,
+    WARMUP_ROWS: WARMUP_ROWS,
+    WARMUP_SPAWN_MS: WARMUP_SPAWN_MS,
+    TIME_LIMITS: TIME_LIMITS,
     GUIDE_VALUE: GUIDE_VALUE,
-    levelConfig: levelConfig,
     createGame: createGame,
     startGame: startGame,
+    beginRace: beginRace,
+    finishRace: finishRace,
     spawnRow: spawnRow,
+    spawnDelay: spawnDelay,
     toggleBit: toggleBit,
     setDraft: setDraft,
     submitDecimal: submitDecimal,
@@ -548,10 +664,10 @@
     bitsFor: bitsFor,
     valueOf: valueOf,
     expression: expression,
-    pointsFor: pointsFor,
-    partialPoints: partialPoints,
+    pointsForTime: pointsForTime,
+    partialForTime: partialForTime,
+    limitLabel: limitLabel,
     streakMultiplier: streakMultiplier,
-    paceName: paceName,
     weakSpotText: weakSpotText
   };
 });
