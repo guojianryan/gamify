@@ -391,7 +391,7 @@
         }
       }, prefersReducedMotion() ? 0 : CLEAR_MS);
     });
-    state.rows.forEach(function (row) {
+    state.rows.forEach(function (row, index) {
       var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
       if (el && el.dataset.mode !== row.mode) {
         el.remove();
@@ -399,19 +399,25 @@
       }
       if (!el) {
         el = buildRow(row);
-        board.appendChild(el);
+        var live = Array.prototype.filter.call(board.children, function (child) {
+          return !child.classList.contains('clearing');
+        });
+        if (live[index]) board.insertBefore(el, live[index]);
+        else board.appendChild(el);
+        window.setTimeout(function () {
+          el.classList.remove('entering');
+        }, prefersReducedMotion() ? 0 : 220);
       }
       updateRow(el, row);
-    });
-    state.rows.forEach(function (row) {
-      var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
-      if (el) board.appendChild(el);
     });
   }
 
   function buildRow(row) {
     var el = document.createElement('article');
     el.className = 'row entering';
+    el.addEventListener('animationend', function (event) {
+      if (event.animationName === 'settle') el.classList.remove('entering');
+    });
     el.dataset.id = String(row.id);
     el.dataset.mode = row.mode;
 
