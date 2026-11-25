@@ -2,7 +2,8 @@
   'use strict';
 
   var logic = window.GateLogic;
-  if (!logic) return;
+  var schematic = window.GateSchematic;
+  if (!logic || !schematic) return;
 
   var STORAGE_KEY = 'gamify.gates.progress';
   var MUTE_KEY = 'gamify.muted';
@@ -154,18 +155,25 @@
     }
   }
 
-  function onTreeClick(event) {
+  function portFromEvent(event) {
     var port = event.target.closest('[data-port]');
+    if (port) return port;
+    var gate = event.target.closest('.sch-gate');
+    return gate ? gate.querySelector('[data-port]') : null;
+  }
+
+  function onTreeClick(event) {
+    var port = portFromEvent(event);
     if (!port || !round || round.status === 'matched') return;
-    openPicker(parsePath(port.dataset.path));
+    openPicker(parsePath(port.getAttribute('data-path') || ''));
   }
 
   function onTreeKey(event) {
-    var port = event.target.closest('[data-port]');
+    var port = portFromEvent(event);
     if (!port) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      openPicker(parsePath(port.dataset.path));
+      openPicker(parsePath(port.getAttribute('data-path') || ''));
     }
   }
 
@@ -466,76 +474,20 @@
   function renderTree() {
     var root = document.getElementById('circuit-tree');
     root.replaceChildren();
-    root.appendChild(renderNode(round.circuit, []));
-  }
-
-  function renderNode(node, path) {
-    if (!node) {
-      var empty = document.createElement('button');
-      empty.type = 'button';
-      empty.className = 'port empty-port';
-      empty.dataset.port = '1';
-      empty.dataset.path = path.join('.');
-      empty.textContent = path.length ? 'Empty port' : 'Add gate or input';
-      empty.setAttribute('aria-label', path.length ? 'Empty port — choose a gate or input' : 'Feed the lamp — choose a gate or input');
-      return empty;
+    var env = currentEnv();
+    var signals = env
+      ? schematic.collectSignals(round.circuit, env, logic)
+      : {};
+    // Root output signal for the final wire / lamp feed
+    if (env && logic.isComplete(round.circuit)) {
+      var rootOut = logic.evaluate(round.circuit, env);
+      signals[''] = rootOut === null ? 'x' : String(rootOut);
     }
-
-    if (node.type === 'input') {
-      var wrap = document.createElement('div');
-      wrap.className = 'node input-node';
-      wrap.dataset.signal = signalAt(path);
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'port input-port';
-      btn.dataset.port = '1';
-      btn.dataset.path = path.join('.');
-      btn.textContent = node.name;
-      btn.setAttribute('aria-label', 'Input ' + node.name + ' — press Enter to change');
-      var bit = document.createElement('span');
-      bit.className = 'signal-bit';
-      bit.textContent = signalLabel(path);
-      wrap.appendChild(btn);
-      wrap.appendChild(bit);
-      return wrap;
-    }
-
-    var gate = document.createElement('div');
-    gate.className = 'node gate-node';
-    gate.dataset.op = node.op;
-    gate.dataset.signal = signalAt(path);
-    gate.dataset.arity = String(logic.gateArity(node.op));
-
-    var head = document.createElement('button');
-    head.type = 'button';
-    head.className = 'gate-head';
-    head.dataset.port = '1';
-    head.dataset.path = path.join('.');
-    head.textContent = node.op;
-    head.setAttribute('aria-label', node.op + ' gate — press Enter to replace');
-
-    var body = document.createElement('div');
-    body.className = 'gate-inputs';
-    (node.inputs || []).forEach(function (child, index) {
-      var slot = document.createElement('div');
-      slot.className = 'gate-slot';
-      var wire = document.createElement('span');
-      wire.className = 'wire';
-      wire.dataset.signal = child ? signalAt(path.concat(index)) : 'x';
-      wire.setAttribute('aria-hidden', 'true');
-      slot.appendChild(wire);
-      slot.appendChild(renderNode(child, path.concat(index)));
-      body.appendChild(slot);
+    var drawn = schematic.render(round.circuit, {
+      logic: logic,
+      signals: signals
     });
-
-    var outBit = document.createElement('span');
-    outBit.className = 'signal-bit gate-out';
-    outBit.textContent = signalLabel(path);
-
-    gate.appendChild(body);
-    gate.appendChild(head);
-    gate.appendChild(outBit);
-    return gate;
+    root.appendChild(drawn.svg);
   }
 
   function renderTruth() {
@@ -644,20 +596,6 @@
     if (!round || !anim.rows.length) return null;
     if (anim.index < 0 || anim.index >= anim.rows.length) return null;
     return anim.rows[anim.index].env;
-  }
-
-  function signalAt(path) {
-    var env = currentEnv();
-    if (!env || !round) return 'x';
-    var node = logic.pathGet(round.circuit, path);
-    if (!node || !logic.isComplete(node)) return 'x';
-    var v = logic.evaluate(node, env);
-    return v === null ? 'x' : String(v);
-  }
-
-  function signalLabel(path) {
-    var s = signalAt(path);
-    return s === 'x' ? '' : s;
   }
 
   function paintLamp(forceOn) {

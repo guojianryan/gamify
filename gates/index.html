@@ -119,14 +119,13 @@
               </div>
             </div>
 
-            <div class="circuit-board" id="circuit-board" aria-label="Circuit builder">
+            <div class="circuit-board" id="circuit-board" aria-label="Circuit schematic">
               <div class="circuit-scroll">
-                <div class="circuit-tree" id="circuit-tree"></div>
+                <div class="schematic-wrap" id="circuit-tree"></div>
                 <div class="lamp-wrap">
-                  <div class="wire-out" aria-hidden="true"></div>
                   <div class="lamp" id="lamp" data-on="0" role="img" aria-label="Output lamp off">
                     <span class="lamp-glass"></span>
-                    <span class="lamp-label">OUT</span>
+                    <span class="lamp-label">Y</span>
                   </div>
                 </div>
               </div>
@@ -173,7 +172,7 @@
               <h2>How a puzzle works</h2>
               <ol>
                 <li><strong>Read the expression.</strong> Brackets and order matter.</li>
-                <li><strong>Build the tree.</strong> Tap an empty port, pick an input or a gate, nest as needed.</li>
+                <li><strong>Build the schematic.</strong> Tap an empty port or gate, pick an input or a gate, nest as needed.</li>
                 <li><strong>Watch the table.</strong> It updates from your circuit. Play the signal run to see every row flow.</li>
                 <li><strong>Check when ready.</strong> Any circuit with the same truth table wins. Faster builds earn a speed bonus.</li>
               </ol>
@@ -219,6 +218,7 @@
   <p class="sr-only" id="live" aria-live="polite"></p>
   <noscript>This lab needs JavaScript.</noscript>
   <script src="../js/gate-logic.js"></script>
+  <script src="../js/gate-schematic.js"></script>
   <script src="../js/gate-game.js"></script>
 </body>
 </html>
