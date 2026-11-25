@@ -12,7 +12,7 @@ Then visit `/`, `/binary/`, and `/gates/`.
 
 ## Binary game
 
-An 8-bit conversion drill. The first row sits under the place values, and new rows are added below it. Solving a row lets the ones under it move up. A seventh row ends the round.
+An 8-bit conversion drill. Place values sit at the top. The first row is right under them, and new rows are added below. Solving a row lets the ones under it move up. A seventh row ends the round.
 
 - A decimal on the right means you click bits until the 1s add up to it. The row clears on its own.
 - Bits already set, with a blank on the right, means you type the decimal. The row leaves when the number is right. Enter checks a wrong number.

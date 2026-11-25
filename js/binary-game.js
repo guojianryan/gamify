@@ -344,7 +344,7 @@
     var padTop = pad && !pad.hidden ? pad.getBoundingClientRect().top : window.innerHeight;
     var row = input.closest('.row');
     var rect = row ? row.getBoundingClientRect() : input.getBoundingClientRect();
-    var margin = 12;
+    var margin = 8;
     var delta = 0;
     if (rect.bottom > padTop - margin) delta = rect.bottom - (padTop - margin);
     else if (rect.top < margin) delta = rect.top - margin;
