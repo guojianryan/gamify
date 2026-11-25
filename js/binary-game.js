@@ -15,6 +15,8 @@
   if (progress.misses) state.misses = progress.misses;
 
   var selectedId = null;
+  var userRowId = null;
+  var markingFocus = false;
   var coach = storageGet('gamify.binary.coach') === '1';
   var forceValues = storageGet('gamify.binary.forceValues') === '1';
   var muted = storageGet('gamify.muted') === '1';
@@ -163,6 +165,7 @@
     var id = Number(input.closest('.row').dataset.id);
     var drafted = logic.setDraft(state, id, input.value);
     state = drafted.state;
+    userRowId = id;
     var row = findRow(id);
     if (row && input.value !== row.draft) input.value = row.draft;
     input.classList.remove('wrong');
@@ -199,6 +202,7 @@
     if (heldRows().length) return;
     var rowEl = event.currentTarget;
     selectedId = Number(rowEl.dataset.id);
+    userRowId = selectedId;
     var bit = event.target.closest('[data-bit]');
     if (bit && !bit.disabled) {
       onToggle(selectedId, Number(bit.dataset.bit));
@@ -250,6 +254,7 @@
     if (row.mode === 'decimal' && /^[0-9]$/.test(key)) {
       event.preventDefault();
       selectedId = row.id;
+      userRowId = row.id;
       var drafted = logic.setDraft(state, row.id, row.draft + key);
       state = drafted.state;
       if (decimalReady(row.id)) {
@@ -263,6 +268,7 @@
     if (row.mode === 'decimal' && key === 'Backspace') {
       event.preventDefault();
       selectedId = row.id;
+      userRowId = row.id;
       state = logic.setDraft(state, row.id, row.draft.slice(0, -1)).state;
       render();
       focusInput(row.id);
@@ -275,6 +281,7 @@
     }
     if (row.mode === 'bits' && /^[1-8]$/.test(key)) {
       event.preventDefault();
+      userRowId = row.id;
       onToggle(row.id, Number(key) - 1);
     }
   }
@@ -303,6 +310,7 @@
     var active = document.activeElement;
     var rowEl = active && active.closest ? active.closest('#board .row') : null;
     var id = rowEl ? Number(rowEl.dataset.id) : selectedId;
+    userRowId = id;
     var row = findRow(id);
     if (!row || row.mode !== 'decimal' || row.phase !== 'play' || state.status !== 'playing') return;
     if (key.dataset.key === 'enter') {
@@ -359,12 +367,23 @@
   function focusInput(id) {
     var input = document.querySelector('.row[data-id="' + id + '"] input');
     if (!input || input.disabled) return;
+    markingFocus = true;
     input.focus({ preventScroll: true });
+    markingFocus = false;
     syncKeypad();
     keepInputVisible(input);
     window.requestAnimationFrame(function () {
       if (document.activeElement === input) keepInputVisible(input);
     });
+  }
+
+  function focusArrival(rowId) {
+    var row = findRow(rowId);
+    if (!row || state.status !== 'playing' || row.phase !== 'play') return;
+    if (userRowId != null && userRowId !== rowId && findRow(userRowId)) return;
+    selectedId = rowId;
+    if (row.mode === 'decimal') focusInput(rowId);
+    else focusSelected();
   }
 
   function focusSelected() {
@@ -530,6 +549,7 @@
       input.addEventListener('keydown', onDraftKeydown);
       input.addEventListener('focus', function () {
         selectedId = Number(el.dataset.id);
+        if (!markingFocus) userRowId = selectedId;
         paintSelection();
         syncKeypad();
         keepInputVisible(input);
@@ -911,6 +931,9 @@
     applyEvents(spawned.events);
     render();
     afterEvents(spawned.events);
+    spawned.events.forEach(function (event) {
+      if (event.type === 'spawn') focusArrival(event.rowId);
+    });
   }
 
   function tickMeter() {
@@ -974,6 +997,7 @@
   function ensureSelection() {
     var stillThere = state.rows.some(function (row) { return row.id === selectedId; });
     if (!stillThere) selectedId = state.rows.length ? state.rows[0].id : null;
+    if (userRowId != null && !findRow(userRowId)) userRowId = null;
   }
 
   function findRow(id) {

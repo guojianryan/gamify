@@ -464,6 +464,11 @@ button.bit:not(:disabled):hover {
   box-shadow: inset 0 0 0 2px var(--stamp);
 }
 
+.ticket input:focus,
+.ticket input:focus-visible {
+  outline: none;
+}
+
 .row.shake .bit,
 .row.shake .ticket {
   animation: shake 180ms ease;
