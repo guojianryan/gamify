@@ -1,6 +1,6 @@
 # Gamify
 
-Lesson games for class. The landing page is the bench. Each game has its own page. The binary game is the first one.
+Lesson games for class. The landing page is the bench. Each game has its own page.
 
 Open it with any static server:
 
@@ -8,7 +8,7 @@ Open it with any static server:
 python3 -m http.server 8000
 ```
 
-Then visit `/` and `/binary/`.
+Then visit `/`, `/binary/`, and `/gates/`.
 
 ## Binary game
 
@@ -31,4 +31,17 @@ The rules live in `js/binary-logic.js` and do not touch the page, so they can be
 
 ```bash
 node --test test/binary-logic.test.js
+```
+
+## Logic Gate Lab
+
+Build a circuit that matches a Boolean expression. The truth table updates from the circuit you build, and a signal run walks every input combination through the gates.
+
+- Level 1 uses AND, OR and NOT. Level 2 adds XOR, NAND and NOR after six Level 1 solves (or “try this session”).
+- Matching is by truth-table behaviour, not circuit shape.
+- A gentle speed bonus rewards faster correct builds; relaxed mode turns the clock off.
+- Design note: `gates/DESIGN.md`. Report: `gates/REPORT.md`.
+
+```bash
+node --test test/gate-logic.test.js
 ```

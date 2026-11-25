@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logic Gate Lab — Gamify</title>
+  <meta name="description" content="Build a circuit for a Boolean expression, watch every input combination flow through the gates, and match the truth table.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/site.css">
+</head>
+<body data-view="setup" data-status="ready">
+  <a class="skip" href="#lab">Skip to the lab</a>
+  <div class="shell">
+    <header class="mast">
+      <a class="brand" href="../">Gamify</a>
+      <nav aria-label="Lessons">
+        <a href="../binary/">Binary game</a>
+        <a href="./" aria-current="page">Logic Gate Lab</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="setup" class="setup gate-setup">
+        <div>
+          <p class="kicker">Boolean lab</p>
+          <h1>Logic Gate Lab</h1>
+          <p class="deck">Read a Boolean expression, build a circuit that matches it, and watch every input combination light the wires. Matching is by truth table — any correct circuit counts.</p>
+        </div>
+        <form id="setup-form" class="gate-setup-form">
+          <fieldset>
+            <legend>Choose a level</legend>
+            <div class="paces gate-levels" id="level-picks" role="radiogroup" aria-label="Level">
+              <label class="pace">
+                <input type="radio" name="level" value="1" checked>
+                <span>
+                  <strong>Level 1 — Basics</strong>
+                  <small>AND, OR and NOT. Unlocked.</small>
+                </span>
+              </label>
+              <label class="pace" id="level2-label">
+                <input type="radio" name="level" value="2" id="level2-radio" disabled>
+                <span>
+                  <strong>Level 2 — Extra gates</strong>
+                  <small id="level2-copy">Locked. Solve 6 Level 1 puzzles to open XOR, NAND and NOR.</small>
+                </span>
+              </label>
+            </div>
+            <div class="unlock-meter" id="unlock-meter" aria-live="polite">
+              <div class="unlock-track" aria-hidden="true"><span id="unlock-fill"></span></div>
+              <p id="unlock-label">0 / 6 Level 1 solves toward Level 2</p>
+            </div>
+            <p class="session-unlock">
+              <button type="button" class="button secondary" id="session-level2">Try Level 2 this session</button>
+            </p>
+          </fieldset>
+          <fieldset>
+            <legend>Pace</legend>
+            <label class="check pace-check">
+              <input type="checkbox" id="relaxed">
+              Relaxed mode — no clock, full speed bonus still counts
+            </label>
+          </fieldset>
+          <button class="button" type="submit" id="start">Start lab</button>
+        </form>
+      </section>
+
+      <section class="stage gate-stage" id="play" hidden>
+        <div class="hud">
+          <div class="stat">
+            <span>Score</span>
+            <strong id="score">0</strong>
+            <em id="gain" class="gain" aria-hidden="true"></em>
+          </div>
+          <div class="stat">
+            <span>Streak</span>
+            <strong id="streak">0</strong>
+          </div>
+          <div class="stat">
+            <span>Solved</span>
+            <strong id="solved">0</strong>
+          </div>
+          <div class="stat">
+            <span>Best</span>
+            <strong id="best">0</strong>
+          </div>
+          <div class="stat" id="speed-stat">
+            <span>Speed bonus</span>
+            <strong id="speed-bonus">+50</strong>
+            <div class="speed-meter" aria-hidden="true"><span id="speed-fill"></span></div>
+          </div>
+          <div class="hud-controls">
+            <button type="button" class="button secondary" id="mute">Sound on</button>
+            <button type="button" class="button secondary" id="pause">Pause</button>
+            <button type="button" class="button secondary" id="quit">Levels</button>
+          </div>
+          <p id="toast" class="toast" hidden></p>
+        </div>
+
+        <div class="gate-layout" id="lab">
+          <div class="gate-main">
+            <div class="expr-banner">
+              <p class="kicker">Build this</p>
+              <p class="expr" id="expression" aria-live="polite">—</p>
+              <p class="hint-line" id="hint-line" hidden></p>
+            </div>
+
+            <div class="bench-tools">
+              <div class="palette" id="palette" aria-label="Gates and inputs"></div>
+              <div class="bench-actions">
+                <button type="button" class="button secondary" id="undo" disabled>Undo</button>
+                <button type="button" class="button secondary" id="clear-circuit">Clear</button>
+                <button type="button" class="button secondary" id="hint">Hint (−15)</button>
+                <button type="button" class="button" id="check">Check circuit</button>
+              </div>
+            </div>
+
+            <div class="circuit-board" id="circuit-board" aria-label="Circuit builder">
+              <div class="circuit-scroll">
+                <div class="circuit-tree" id="circuit-tree"></div>
+                <div class="lamp-wrap">
+                  <div class="wire-out" aria-hidden="true"></div>
+                  <div class="lamp" id="lamp" data-on="0" role="img" aria-label="Output lamp off">
+                    <span class="lamp-glass"></span>
+                    <span class="lamp-label">OUT</span>
+                  </div>
+                </div>
+              </div>
+              <div class="picker" id="picker" hidden>
+                <p class="kicker" id="picker-title">Place in port</p>
+                <div class="picker-grid" id="picker-grid"></div>
+                <button type="button" class="button secondary" id="picker-cancel">Cancel</button>
+              </div>
+            </div>
+
+            <div class="feedback" id="feedback" hidden></div>
+            <div class="celebrate" id="celebrate" hidden aria-live="polite">
+              <p class="celebrate-banner">Matched</p>
+            </div>
+
+            <div class="anim-bar">
+              <p class="kicker">Signal run</p>
+              <p class="anim-status" id="anim-status">Press play to walk every input combination.</p>
+              <div class="anim-controls">
+                <button type="button" class="button secondary" id="anim-play">Play</button>
+                <button type="button" class="button secondary" id="anim-pause" disabled>Pause</button>
+                <button type="button" class="button secondary" id="anim-step">Step</button>
+                <button type="button" class="button secondary" id="anim-replay">Replay</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="gate-side">
+            <div class="truth-panel">
+              <p class="kicker">Truth table</p>
+              <p class="caption" id="table-caption">Built from your circuit as you place gates.</p>
+              <div class="truth-wrap">
+                <table class="truth" id="truth-table">
+                  <thead id="truth-head"></thead>
+                  <tbody id="truth-body"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="gate-glossary" id="glossary">
+              <p class="kicker">Gate strip</p>
+              <ul id="glossary-list"></ul>
+            </div>
+            <div class="howto">
+              <h2>How a puzzle works</h2>
+              <ol>
+                <li><strong>Read the expression.</strong> Brackets and order matter.</li>
+                <li><strong>Build the tree.</strong> Tap an empty port, pick an input or a gate, nest as needed.</li>
+                <li><strong>Watch the table.</strong> It updates from your circuit. Play the signal run to see every row flow.</li>
+                <li><strong>Check when ready.</strong> Any circuit with the same truth table wins. Faster builds earn a speed bonus.</li>
+              </ol>
+              <p class="keys">Keyboard: Tab through ports, Enter to place, Esc closes the picker, C checks, P pauses, Space steps the signal run when focused in the lab.</p>
+            </div>
+          </aside>
+        </div>
+
+        <div class="overlay" id="overlay" hidden>
+          <div class="card">
+            <h2>Paused</h2>
+            <p>The speed meter is held. Your circuit stays as you left it.</p>
+            <button type="button" class="button" id="resume">Resume</button>
+          </div>
+        </div>
+
+        <div class="overlay unlock-overlay" id="unlock-overlay" hidden>
+          <div class="card unlock-card">
+            <p class="kicker">Unlocked</p>
+            <h2>Level 2 is open</h2>
+            <p>XOR, NAND and NOR join the palette. You can keep going on Level 1, or switch from the level screen.</p>
+            <button type="button" class="button" id="unlock-dismiss">Keep building</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section tips" id="ways">
+        <h2>Ways to see a gate</h2>
+        <ul>
+          <li><strong>AND</strong> is only 1 when every input is 1. <strong>OR</strong> is 1 when any input is 1.</li>
+          <li><strong>NOT</strong> flips a single wire. <strong>NAND</strong> and <strong>NOR</strong> are AND/OR with a NOT on the result.</li>
+          <li><strong>XOR</strong> is 1 when the inputs disagree — useful for “one or the other, not both”.</li>
+          <li>Two circuits can look different and still share a truth table. Matching is by behaviour.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>Six Level 1 solves unlock Level 2. Scores and unlocks stay in this browser when storage is available.</p>
+      <p><a href="../">All lessons</a></p>
+    </footer>
+  </div>
+  <p class="sr-only" id="live" aria-live="polite"></p>
+  <noscript>This lab needs JavaScript.</noscript>
+  <script src="../js/gate-logic.js"></script>
+  <script src="../js/gate-game.js"></script>
+</body>
+</html>
