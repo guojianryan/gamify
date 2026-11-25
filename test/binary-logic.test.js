@@ -29,25 +29,20 @@ test('every byte round-trips through the place values', () => {
   assert.equal(L.expression(0), '0');
 });
 
-test('level pace keeps a full byte, then hides place values and tightens the clock', () => {
-  assert.equal(L.levelConfig(1).maxValue, 255);
-  assert.equal(L.levelConfig(1).bitsBias, 0.5);
-  assert.equal(L.levelConfig(1).showValues, true);
-  assert.equal(L.levelConfig(1).spawnMs, 4200);
-  assert.equal(L.levelConfig(3).maxValue, 255);
-  assert.equal(L.levelConfig(3).bitsBias, 0.5);
-  assert.equal(L.levelConfig(3).showValues, true);
-  assert.equal(L.levelConfig(3).spawnMs, 3100);
-  assert.equal(L.levelConfig(4).showValues, true);
-  assert.equal(L.levelConfig(5).maxValue, 255);
-  assert.equal(L.levelConfig(5).bitsBias, 0.5);
-  assert.equal(L.levelConfig(5).showValues, false);
-  assert.equal(L.levelConfig(5).spawnMs, 2000);
-  assert.equal(L.levelConfig(6).bitsBias, 0.5);
-  assert.equal(L.levelConfig(7).spawnMs, 1600);
-  assert.equal(L.levelConfig(12).spawnMs, 1600);
-  assert.ok(L.levelConfig(1).spawnMs > L.levelConfig(3).spawnMs);
-  assert.ok(L.levelConfig(3).spawnMs > L.levelConfig(5).spawnMs);
+test('a faster clear is worth more, and warm-up stays slow', () => {
+  assert.equal(L.pointsForTime(1000), 100);
+  assert.equal(L.pointsForTime(2000), 100);
+  assert.equal(L.pointsForTime(10000), 20);
+  assert.equal(L.pointsForTime(20000), 20);
+  assert.ok(L.pointsForTime(3000) > L.pointsForTime(7000));
+  assert.equal(L.partialForTime(2000), 50);
+  assert.equal(L.spawnDelay({ racing: false, solveTimes: [1000] }), L.WARMUP_SPAWN_MS);
+  assert.equal(L.spawnDelay({ racing: true, solveTimes: [] }), L.WARMUP_SPAWN_MS);
+  assert.equal(L.spawnDelay({ racing: true, solveTimes: [2000, 2000, 2000] }), 1700);
+  assert.equal(L.spawnDelay({ racing: true, solveTimes: [1000] }), 1600);
+  assert.equal(L.spawnDelay({ racing: true, solveTimes: [20000] }), 8000);
+  assert.deepEqual(L.TIME_LIMITS, [60, 120, 300]);
+  assert.equal(L.limitLabel(120), '2 minutes');
 });
 
 test('a row is an even draw from 0 to 255, both directions, and does not repeat', () => {
@@ -114,36 +109,59 @@ test('a wrong bit stays up with the working, then one retry scores half', () => 
   const solved = L.toggleBit(retry.state, first.id, 7);
   assert.equal(solved.state.rows.length, 1);
   assert.equal(solved.state.rows[0].id, second.id);
-  assert.equal(solved.state.score, L.partialPoints(1));
+  assert.equal(solved.state.score, L.partialForTime());
   assert.equal(solved.state.streak, 0);
   assert.equal(solved.events[0].partial, true);
   assert.equal(L.weakSpotText(early.state.misses), 'Weak spots: 128s and 1s');
 });
 
-test('eight clean rows move from Warm-up to Drill and total 660', () => {
-  let state = L.startGame(L.createGame(), () => 0.1).state;
+test('eight clean rows end warm-up, then a timed race keeps the faster score', () => {
+  let now = 0;
+  let state = L.startGame(L.createGame(), () => 0.1, { now }).state;
   let last = null;
-  for (let i = 0; i < 7; i += 1) {
-    if (state.rows.length === 0) state = L.spawnRow(state, () => 0.1).state;
-    state = solveBits(state);
+  for (let i = 0; i < 8; i += 1) {
+    if (state.rows.length === 0) {
+      now += 10;
+      state = L.spawnRow(state, () => 0.1, now).state;
+    }
+    now += 2000;
+    const row = state.rows[0];
+    L.bitsFor(row.value).forEach((bit, index) => {
+      if (!bit) return;
+      last = L.toggleBit(state, row.id, index, now);
+      state = last.state;
+    });
   }
-  assert.equal(state.level, 1);
-  if (state.rows.length === 0) state = L.spawnRow(state, () => 0.1).state;
-  const row = state.rows[0];
-  L.bitsFor(row.value).forEach((bit, index) => {
-    if (!bit) return;
-    last = L.toggleBit(state, row.id, index);
-    state = last.state;
-  });
-  assert.equal(state.level, 3);
-  assert.equal(L.paceName(state), 'Drill');
+  assert.equal(state.status, 'choose');
+  assert.equal(state.racing, false);
+  assert.equal(state.cleanRows, 8);
   assert.equal(state.solved, 8);
-  assert.equal(state.cleanRows, 0);
-  assert.equal(state.score, 660);
-  assert.equal(state.highScore, 660);
-  assert.equal(state.bestStreak, 8);
-  assert.equal(L.streakMultiplier(8), 5);
-  assert.ok(last.events.some((event) => event.type === 'pace' && event.name === 'Drill'));
+  assert.equal(L.spawnDelay(state), L.WARMUP_SPAWN_MS);
+  assert.ok(last.events.some((event) => event.type === 'choose'));
+  assert.equal(L.beginRace(state, 90).state.status, 'choose');
+
+  const race = L.beginRace(state, 120, () => 0.1, now);
+  assert.equal(race.state.status, 'playing');
+  assert.equal(race.state.racing, true);
+  assert.equal(race.state.limitSec, 120);
+  assert.equal(race.state.remainingMs, 120000);
+  assert.equal(race.state.score, 0);
+  assert.equal(race.state.rows.length, 1);
+  assert.equal(L.spawnDelay(race.state), 1700);
+  assert.ok(race.events.some((event) => event.type === 'race' && event.limitSec === 120));
+
+  const slow = L.spawnRow({ ...L.createGame(), status: 'playing', racing: true, limitSec: 60 }, sequence([0.004, 0]), 0);
+  const slowClear = L.toggleBit(slow.state, slow.state.rows[0].id, 7, 9000);
+  const fast = L.spawnRow({ ...L.createGame(), status: 'playing', racing: true, limitSec: 60 }, sequence([0.004, 0]), 0);
+  const fastClear = L.toggleBit(fast.state, fast.state.rows[0].id, 7, 1500);
+  assert.ok(fastClear.state.score > slowClear.state.score);
+  assert.equal(fastClear.state.score, L.pointsForTime(1500));
+  assert.equal(fastClear.state.highScores[60], fastClear.state.score);
+
+  const done = L.finishRace(race.state);
+  assert.equal(done.state.status, 'over');
+  assert.equal(done.state.endedBy, 'time');
+  assert.equal(done.state.remainingMs, 0);
 });
 
 test('decimal rows stay until the typed total is right', () => {
@@ -178,7 +196,7 @@ test('decimal rows stay until the typed total is right', () => {
   assert.equal(correct.result, 'correct');
   assert.equal(correct.state.rows.length, 0);
   assert.equal(correct.state.streak, 0);
-  assert.equal(correct.state.score, 200 + L.partialPoints(5));
+  assert.equal(correct.state.score, 200 + L.partialForTime());
   assert.equal(correct.events[0].partial, true);
 });
 
@@ -233,12 +251,14 @@ test('drafts keep at most three digits', () => {
   assert.equal(L.setDraft(drafted.state, state.rows[0].id, '123').state, drafted.state);
 });
 
-test('points cap the streak bonus at ten', () => {
-  assert.equal(L.pointsFor(1, 1), 65);
-  assert.equal(L.pointsFor(1, 10), 110);
-  assert.equal(L.pointsFor(1, 11), 110);
-  assert.equal(L.pointsFor(5, 1), 105);
-  assert.equal(L.partialPoints(5), 53);
+test('reading time does not count against a retried clear', () => {
+  let state = L.spawnRow({ ...L.createGame(), status: 'playing' }, sequence([0.004, 0]), 0).state;
+  state = L.toggleBit(state, state.rows[0].id, 0, 1000).state;
+  state = L.releaseHold(state, state.rows[0].id, 3000).state;
+  const solved = L.toggleBit(state, state.rows[0].id, 7, 4500);
+  assert.equal(solved.events[0].elapsed, 2500);
+  assert.equal(solved.events[0].partial, true);
+  assert.equal(solved.state.score, L.partialForTime(2500));
   assert.equal(L.streakMultiplier(0), 1);
   assert.equal(L.streakMultiplier(3), 3);
 });
@@ -277,20 +297,22 @@ test('the guided first row is 10, and a clean miss names both places', () => {
   state = L.toggleBit(state, row.id, 6).state;
   assert.equal(state.rows.length, 0);
   assert.equal(state.guide, false);
-  assert.equal(state.score, L.partialPoints(1));
+  assert.equal(state.score, L.partialForTime());
 });
 
-test('misses and the best pace carry into the next warm-up', () => {
+test('misses and saved race scores carry into the next warm-up', () => {
   let state = L.startGame(L.createGame(), sequence([0.004, 0])).state;
   state = L.toggleBit(state, state.rows[0].id, 0).state;
   const misses = state.misses.slice();
-  state = { ...state, paceIndex: 2, bestPaceIndex: 2, level: 5 };
+  state = { ...state, highScores: { 60: 10, 120: 20, 300: 30 } };
   const next = L.startGame(state, sequence([0.004, 0])).state;
   assert.deepEqual(next.misses, misses);
-  assert.equal(next.bestPaceIndex, 2);
-  assert.equal(next.paceIndex, 0);
-  assert.equal(next.level, 1);
-  assert.equal(L.paceName(2), 'Exam pace');
+  assert.equal(next.highScores[60], 10);
+  assert.equal(next.highScores[120], 20);
+  assert.equal(next.highScores[300], 30);
+  assert.equal(next.racing, false);
+  assert.equal(next.cleanRows, 0);
+  assert.equal(next.status, 'playing');
 });
 
 test('missing the guided row twice brings the same target back', () => {

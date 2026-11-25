@@ -11,9 +11,8 @@
   var MOMENT_MS = 1600;
 
   var progress = readProgress();
-  var state = logic.createGame(readBest());
+  var state = logic.createGame({ highScores: progress.highScores });
   if (progress.misses) state.misses = progress.misses;
-  if (progress.bestPaceIndex) state.bestPaceIndex = progress.bestPaceIndex;
 
   var selectedId = null;
   var coach = storageGet('gamify.binary.coach') === '1';
@@ -31,6 +30,8 @@
   var swallowClick = false;
   var menuOpen = false;
   var pendingFocusId = null;
+  var raceClock = 0;
+  var raceEndsAt = 0;
 
   var coachBox = document.getElementById('coach');
   var valuesBox = document.getElementById('force-values');
@@ -48,6 +49,7 @@
       else onResume();
     });
     document.getElementById('resume').addEventListener('click', onResume);
+    document.getElementById('choose').addEventListener('click', onChooseLimit);
     document.getElementById('mute').addEventListener('click', function () {
       muted = !muted;
       storageSet('gamify.muted', muted ? '1' : '0');
@@ -90,7 +92,8 @@
     event.preventDefault();
     clearHolds();
     hideMoment();
-    bestAtStart = state.highScore;
+    bestAtStart = 0;
+    stopRaceClock();
     var started = logic.startGame(state, Math.random, {
       guide: storageGet(GUIDE_KEY) !== '1'
     });
@@ -105,20 +108,35 @@
   function onPause() {
     if (state.status !== 'playing') return;
     holdClock();
-    state = logic.pauseGame(state).state;
+    holdRaceClock();
+    state = logic.pauseGame(state, performance.now()).state;
     render();
   }
 
   function onResume() {
     if (state.status !== 'paused') return;
-    state = logic.resumeGame(state).state;
+    state = logic.resumeGame(state, performance.now()).state;
+    render();
+    releaseRaceClock();
+  }
+
+  function onChooseLimit(event) {
+    var button = event.target.closest('[data-limit]');
+    if (!button || state.status !== 'choose') return;
+    var limit = Number(button.dataset.limit);
+    var started = logic.beginRace(state, limit, Math.random, performance.now());
+    if (!started.events.length) return;
+    state = started.state;
+    selectedId = state.rows.length ? state.rows[0].id : null;
+    document.getElementById('board').replaceChildren();
+    applyEvents(started.events);
     render();
   }
 
   function onToggle(id, index) {
     var wasGuide = state.guide;
     var previous = state;
-    var result = logic.toggleBit(state, id, index);
+    var result = logic.toggleBit(state, id, index, performance.now());
     var solved = result.events.some(function (event) { return event.type === 'solved'; });
     state = result.state;
     if (!solved && state !== previous) soundToggle();
@@ -129,7 +147,7 @@
   }
 
   function onSubmit(id) {
-    var result = logic.submitDecimal(state, id);
+    var result = logic.submitDecimal(state, id, performance.now());
     state = result.state;
     applyEvents(result.events);
     render();
@@ -238,8 +256,13 @@
 
   function onVisibility() {
     if (state.status !== 'playing') return;
-    if (document.hidden) holdClock();
-    else syncSpawnClock();
+    if (document.hidden) {
+      holdClock();
+      holdRaceClock();
+    } else {
+      syncSpawnClock();
+      releaseRaceClock();
+    }
   }
 
   function selectedPlayable() {
@@ -285,25 +308,34 @@
 
   function renderHud() {
     document.getElementById('score').textContent = formatNumber(state.score);
-    document.getElementById('pace').textContent = logic.paceName(state);
+    var pace = document.getElementById('pace');
+    if (state.racing) {
+      pace.textContent = formatClock(state.remainingMs);
+      pace.classList.add('clock');
+    } else {
+      pace.textContent = 'Warm-up';
+      pace.classList.remove('clock');
+    }
     document.getElementById('cleared').textContent = String(state.solved);
     document.getElementById('streak').textContent = String(state.streak);
-    document.getElementById('best').textContent = formatNumber(state.highScore);
+    var bestValue = state.racing ? ((state.highScores && state.highScores[state.limitSec]) || 0) : bestOverall(state.highScores);
+    document.getElementById('best').textContent = bestValue ? formatNumber(bestValue) : '—';
     var mult = logic.streakMultiplier(state.streak);
     var multNode = document.getElementById('mult');
     multNode.textContent = '×' + mult;
     multNode.classList.toggle('hot', state.streak > 1);
     var pips = document.getElementById('pips');
-    if (pips.childElementCount !== logic.SOLVES_PER_LEVEL) {
+    pips.hidden = !!state.racing;
+    if (pips.childElementCount !== logic.WARMUP_ROWS) {
       pips.replaceChildren();
-      for (var i = 0; i < logic.SOLVES_PER_LEVEL; i += 1) {
+      for (var i = 0; i < logic.WARMUP_ROWS; i += 1) {
         var pip = document.createElement('span');
         pip.className = 'pip';
         pips.appendChild(pip);
       }
     }
     Array.prototype.forEach.call(pips.children, function (pip, index) {
-      pip.classList.toggle('on', index < state.solvedThisLevel);
+      pip.classList.toggle('on', index < state.cleanRows);
     });
     var pause = document.getElementById('pause');
     var playingOrPaused = state.status === 'playing' || state.status === 'paused';
@@ -313,7 +345,7 @@
 
   function renderRuler() {
     var ruler = document.getElementById('ruler');
-    var show = forceValues || logic.levelConfig(state.level).showValues;
+    var show = true;
     if (!ruler.childElementCount) {
       logic.BIT_VALUES.forEach(function (value) {
         var span = document.createElement('span');
@@ -487,8 +519,10 @@
   }
 
   function renderChrome() {
-    document.getElementById('setup').hidden = state.status === 'playing' || state.status === 'paused';
+    var inRound = state.status === 'playing' || state.status === 'paused' || state.status === 'choose';
+    document.getElementById('setup').hidden = inRound;
     document.getElementById('overlay').hidden = state.status !== 'paused';
+    document.getElementById('choose').hidden = state.status !== 'choose';
     var playfield = document.getElementById('playfield');
     var nearlyFull = state.status === 'playing' && state.rows.length >= logic.MAX_ROWS - 1;
     playfield.classList.toggle('danger', nearlyFull);
@@ -498,16 +532,14 @@
     guide.hidden = !showGuide;
     if (showGuide) guide.textContent = 'Tap the 8 and the 2 to make 10.';
     var best = document.getElementById('best-pace');
-    if (state.bestPaceIndex > 0) {
-      best.hidden = false;
-      best.textContent = 'Best pace: ' + logic.paceName(state.bestPaceIndex) + '.';
-    } else {
-      best.hidden = true;
-    }
+    best.hidden = false;
+    best.textContent = bestLine(state.highScores);
     var empty = document.getElementById('empty');
     empty.hidden = state.rows.length !== 0 || !!document.querySelector('#board .row');
-    if (state.status === 'playing') {
+    if (state.status === 'playing' && state.racing) {
       empty.textContent = 'Column clear. The next row is on the way.';
+    } else if (state.status === 'playing') {
+      empty.textContent = 'Warm-up. The next row is on the way.';
     } else if (state.status === 'ready') {
       empty.textContent = storageGet(GUIDE_KEY) === '1'
         ? 'Press start. The first row appears at the top of the column.'
@@ -529,11 +561,25 @@
     box.hidden = false;
     box.replaceChildren();
     var heading = document.createElement('h2');
-    heading.textContent = state.score > bestAtStart ? 'New best.' : 'The column filled.';
+    if (!state.racing && state.endedBy !== 'time') {
+      heading.textContent = 'Warm-up ended.';
+    } else if (state.score > bestAtStart) {
+      heading.textContent = 'New best.';
+    } else if (state.endedBy === 'time') {
+      heading.textContent = 'Time.';
+    } else {
+      heading.textContent = 'The column filled.';
+    }
     var summary = document.createElement('p');
-    summary.textContent = 'Score ' + formatNumber(state.score)
-      + '. ' + logic.paceName(state)
-      + '. ' + state.solved + ' cleared. Best streak ' + state.bestStreak + '.';
+    var summaryText = 'Score ' + formatNumber(state.score);
+    if (state.racing || state.endedBy === 'time') {
+      summaryText += ' in ' + logic.limitLabel(state.limitSec);
+      if (state.endedBy === 'column' && state.remainingMs > 0) {
+        summaryText += ', with ' + formatClock(state.remainingMs) + ' left';
+      }
+    }
+    summaryText += '. ' + state.solved + ' cleared. Best streak ' + state.bestStreak + '.';
+    summary.textContent = summaryText;
     var weakText = logic.weakSpotText(state.misses);
     var weak = null;
     if (weakText) {
@@ -551,30 +597,37 @@
       item.textContent = formatBits(row.value) + ' = ' + logic.expression(row.value) + ' = ' + row.value;
       list.appendChild(item);
     });
-    if (weak) box.append(heading, summary, weak, note, list);
-    else box.append(heading, summary, note, list);
+    var parts = [heading, summary];
+    if (weak) parts.push(weak);
+    if (state.rows.length) parts.push(note, list);
+    box.append.apply(box, parts);
   }
 
   function pressureText() {
+    if (state.status === 'choose') return 'Warm-up done. Pick a time.';
     if (state.status !== 'playing') return '';
     if (state.guide) return 'One row. Tap the marked bits.';
     var open = logic.MAX_ROWS - state.rows.length;
     if (open <= 0) return 'Clear a row before the next one arrives.';
     if (open === 1) return 'One empty slot.';
-    return state.rows.length + ' of ' + logic.MAX_ROWS + ' rows on the column.';
+    var count = state.rows.length + ' of ' + logic.MAX_ROWS + ' rows on the column.';
+    if (!state.racing) return 'Warm-up. ' + count;
+    return count;
   }
 
   function applyEvents(events) {
     var gained = 0;
     var multiplier = 1;
-    var paceEvent = null;
+    var chose = false;
+    var raceLimit = 0;
     events.forEach(function (event) {
       if (event.type === 'spawn' && event.mode === 'decimal') pendingFocusId = event.rowId;
       if (event.type === 'solved') {
         gained += event.gained;
         multiplier = event.multiplier || 1;
       }
-      if (event.type === 'pace') paceEvent = event;
+      if (event.type === 'choose') chose = true;
+      if (event.type === 'race') raceLimit = event.limitSec;
       if (event.type === 'teach' || event.type === 'reveal') {
         soundWrong();
         announce(event.feedback);
@@ -584,20 +637,22 @@
         soundOver();
         announce('Round over. Score ' + formatNumber(event.score) + '.');
         stopClock();
+        stopRaceClock();
       }
     });
     if (gained) {
-      if (paceEvent) soundLevel();
-      else soundClear();
+      soundClear();
       flashGain(gained, multiplier);
-      if (paceEvent) announce('Cleared. ' + paceEvent.name + '.');
-      else announce('Cleared. Score ' + formatNumber(state.score) + '.');
+      announce('Cleared. ' + gained + ' points. Score ' + formatNumber(state.score) + '.');
     }
-    if (paceEvent) {
-      showMoment(paceEvent.name);
-      if (!logic.levelConfig(paceEvent.level).showValues && !forceValues) {
-        toast('Place values are hidden. You can pin them back on.');
-      }
+    if (chose) {
+      stopClock();
+      announce('Warm-up done. Pick 1 minute, 2 minutes, or 5 minutes.');
+    }
+    if (raceLimit) {
+      bestAtStart = (state.highScores && state.highScores[raceLimit]) || 0;
+      startRaceClock();
+      announce(logic.limitLabel(raceLimit) + '. Score as many points as you can.');
     }
     if (events.some(function (event) {
       return event.type === 'solved' || event.type === 'teach' || event.type === 'reveal' || event.type === 'over' || event.type === 'pace';
@@ -637,7 +692,7 @@
 
   function spawnFollowUp() {
     if (state.rows.length >= logic.MAX_ROWS) return;
-    var spawned = logic.spawnRow(state, Math.random);
+    var spawned = logic.spawnRow(state, Math.random, performance.now());
     state = spawned.state;
     applyEvents(spawned.events);
   }
@@ -661,7 +716,7 @@
       window.clearTimeout(holds[rowId]);
       delete holds[rowId];
     }
-    var result = logic.releaseHold(state, rowId);
+    var result = logic.releaseHold(state, rowId, performance.now());
     if (!result.events.length) return;
     state = result.state;
     render();
@@ -678,7 +733,7 @@
         window.clearTimeout(holds[row.id]);
         delete holds[row.id];
       }
-      var result = logic.releaseHold(state, row.id);
+      var result = logic.releaseHold(state, row.id, performance.now());
       if (!result.events.length) return;
       state = result.state;
       var released = findRow(row.id);
@@ -733,7 +788,7 @@
 
   function startClock(ms) {
     stopClock();
-    var delay = ms == null ? logic.levelConfig(state.level).spawnMs : ms;
+    var delay = ms == null ? logic.spawnDelay(state) : ms;
     var handle = window.setTimeout(onSpawnDue, delay);
     clock = {
       held: false,
@@ -771,7 +826,7 @@
   function onSpawnDue() {
     clock = null;
     if (state.status !== 'playing') return;
-    var spawned = logic.spawnRow(state, Math.random);
+    var spawned = logic.spawnRow(state, Math.random, performance.now());
     state = spawned.state;
     applyEvents(spawned.events);
     render();
@@ -796,7 +851,7 @@
 
   function flashGain(amount, multiplier) {
     var gain = document.getElementById('gain');
-    gain.textContent = multiplier > 1 ? '+' + amount + ' ×' + multiplier : '+' + amount;
+    gain.textContent = '+' + amount;
     gain.classList.remove('pop');
     void gain.offsetWidth;
     gain.classList.add('pop');
@@ -871,24 +926,18 @@
   }
 
   function persistBest() {
-    storageSet('gamify.binary.highScore', String(state.highScore));
+    storageSet('gamify.binary.highScore', String(bestOverall(state.highScores)));
   }
 
   function persistProgress() {
     storageSet(PROGRESS_KEY, JSON.stringify({
-      bestPaceIndex: state.bestPaceIndex || 0,
+      highScores: state.highScores,
       misses: state.misses
     }));
   }
 
-  function readBest() {
-    var raw = storageGet('gamify.binary.highScore');
-    var number = Number(raw);
-    return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
-  }
-
   function readProgress() {
-    var empty = { bestPaceIndex: 0, misses: null };
+    var empty = { highScores: { 60: 0, 120: 0, 300: 0 }, misses: null };
     try {
       var parsed = JSON.parse(storageGet(PROGRESS_KEY) || 'null');
       if (!parsed || typeof parsed !== 'object') return empty;
@@ -896,12 +945,77 @@
         ? parsed.misses.map(function (n) { return Math.max(0, n | 0); })
         : null;
       return {
-        bestPaceIndex: Math.max(0, parsed.bestPaceIndex | 0),
+        highScores: logic.createGame({ highScores: parsed.highScores }).highScores,
         misses: misses
       };
     } catch (error) {
       return empty;
     }
+  }
+
+  function bestOverall(scores) {
+    return logic.TIME_LIMITS.reduce(function (max, limit) {
+      return Math.max(max, scores && scores[limit] ? scores[limit] : 0);
+    }, 0);
+  }
+
+  function bestLine(scores) {
+    var parts = logic.TIME_LIMITS.map(function (limit) {
+      var best = scores && scores[limit] ? formatNumber(scores[limit]) : '—';
+      return logic.limitLabel(limit) + ' ' + best;
+    });
+    return 'Best: ' + parts.join(' · ');
+  }
+
+  function formatClock(ms) {
+    var total = Math.max(0, Math.ceil((ms || 0) / 1000));
+    var minutes = Math.floor(total / 60);
+    var seconds = total % 60;
+    return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+  }
+
+  function startRaceClock() {
+    stopRaceClock();
+    if (!state.racing || state.status !== 'playing') return;
+    raceEndsAt = performance.now() + state.remainingMs;
+    raceClock = window.setTimeout(tickRace, 200);
+  }
+
+  function stopRaceClock() {
+    if (raceClock) window.clearTimeout(raceClock);
+    raceClock = 0;
+    raceEndsAt = 0;
+  }
+
+  function holdRaceClock() {
+    if (!state.racing || !raceEndsAt) return;
+    state.remainingMs = Math.max(0, raceEndsAt - performance.now());
+    if (raceClock) window.clearTimeout(raceClock);
+    raceClock = 0;
+    raceEndsAt = 0;
+  }
+
+  function releaseRaceClock() {
+    if (state.status === 'playing' && state.racing) startRaceClock();
+  }
+
+  function tickRace() {
+    raceClock = 0;
+    if (state.status !== 'playing' || !state.racing) return;
+    var left = raceEndsAt - performance.now();
+    if (left <= 0) {
+      state.remainingMs = 0;
+      raceEndsAt = 0;
+      var finished = logic.finishRace(state);
+      state = finished.state;
+      applyEvents(finished.events);
+      render();
+      return;
+    }
+    state.remainingMs = left;
+    var node = document.getElementById('pace');
+    if (node) node.textContent = formatClock(left);
+    raceClock = window.setTimeout(tickRace, 200);
   }
 
   function storageGet(key) {

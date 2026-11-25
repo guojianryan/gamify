@@ -31,7 +31,7 @@
           <p class="deck">Rows fill the column from the top. Set the bits when a decimal is showing, or type the decimal when the bits are already set. Clear a row before the column is full.</p>
         </div>
         <form id="setup-form">
-          <p class="pace-note">You start at Warm-up. Every number from 0 to 255 is equally likely, and you set bits as often as you read them. Rows arrive sooner as you go. Eight clean rows move you to Drill, then to Exam pace, where the place values hide.</p>
+          <p class="pace-note">Warm-up is slow. After eight clean rows, pick 1, 2, or 5 minutes and score as many points as you can. A faster row is worth more, and the next row arrives based on how fast you have been clearing.</p>
           <p id="best-pace" class="best-pace" hidden></p>
           <button class="button" type="submit" id="start">Start</button>
         </form>
@@ -45,7 +45,7 @@
             <em id="gain" class="gain" aria-hidden="true"></em>
           </div>
           <div class="stat">
-            <span>Pace</span>
+            <span>Time</span>
             <strong id="pace" class="pace-name">Warm-up</strong>
             <div id="pips" class="pips" aria-hidden="true"></div>
           </div>
@@ -102,6 +102,7 @@
             <li><strong>Blank on the right.</strong> The bits are fixed. Tap the box and type their total with the keyboard, then press Enter.</li>
             <li><strong>A miss stays up.</strong> Read the working, then try that row once more.</li>
             <li><strong>The column fills.</strong> Six rows fit. One more arrival ends the round.</li>
+            <li><strong>Then the clock.</strong> After warm-up, pick 1, 2, or 5 minutes. Faster clears score more.</li>
           </ol>
           <p class="keys">Tap a row to select it. On a bit row, keys 1–8 flip columns from the left. On a decimal row, type with the keyboard. Enter submits. P pauses.</p>
         </div>
@@ -119,9 +120,21 @@
     </main>
 
     <footer class="colophon">
-      <p>Numbers run from 0 to 255. Eight clean rows move you from Warm-up to Drill, then to Exam pace, and the next row arrives sooner each time. A miss stays up long enough to read, and one retry still scores. Scores and weak spots stay in this browser.</p>
+      <p>Warm-up is slow. Then a 1, 2, or 5 minute race: the goal is as many points as possible, and a faster row is worth more. Scores and weak spots stay in this browser.</p>
       <p><a href="../">All lessons</a></p>
     </footer>
+  </div>
+  <div id="choose" class="choose" hidden>
+    <div class="card">
+      <p class="kicker">After warm-up</p>
+      <h2>Pick a time</h2>
+      <p>Score as many points as you can. A faster row is worth more. The score starts over at zero.</p>
+      <div class="time-choices">
+        <button type="button" class="button" data-limit="60">1 minute</button>
+        <button type="button" class="button" data-limit="120">2 minutes</button>
+        <button type="button" class="button" data-limit="300">5 minutes</button>
+      </div>
+    </div>
   </div>
   <div id="moment" class="moment" hidden>
     <p class="kicker">Next pace</p>

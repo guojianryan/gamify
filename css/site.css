@@ -642,8 +642,12 @@ legend {
 }
 
 .pace-name {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   letter-spacing: -0.03em;
+}
+
+.pace-name.clock {
+  font-size: 2rem;
 }
 
 .mult {
@@ -877,6 +881,41 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 .menu-panel .button {
   width: 100%;
   box-shadow: none;
+}
+
+.choose {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(27, 25, 20, 0.72);
+}
+
+.choose[hidden] {
+  display: none !important;
+}
+
+.choose .card h2 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 2.4rem;
+  letter-spacing: -0.04em;
+}
+
+.time-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.time-choices .button {
+  width: 100%;
+  min-height: 56px;
+  font-size: 1.25rem;
 }
 
 .moment {

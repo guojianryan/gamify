@@ -18,13 +18,14 @@ An 8-bit conversion drill. Rows fill a six-row column from the top.
 - Bits already set, with a blank on the right, means you type the decimal and press Enter.
 - The round ends when a new row would pass the top of the column.
 - A wrong pattern stays on screen with the working written out. One retry on that row scores half, and the spawn clock waits while you read it.
-- Eight clean rows move the pace from Warm-up to Drill, then to Exam pace. Every pace draws evenly from 0 to 255, and setting bits is as common as reading them. Rows arrive sooner as the pace rises, and the place values hide at Exam pace unless you pin them.
+- There are no levels. Warm-up is eight clean rows at a slow drip, about eight seconds apart. Numbers are an even mix from 0 to 255, and setting bits is as common as reading them.
+- After warm-up, pick a fixed race: 1 minute, 2 minutes, or 5 minutes. The goal is as many points as possible before the clock runs out.
+- A faster clear is worth more. Two seconds or less scores 100. Ten seconds or more scores 20. One retry scores half.
+- After warm-up, the next row arrives a little sooner than the recent clears, so a fast run tightens the column. It never drops below 1.6 seconds or stretches past the warm-up drip.
 - The first visit opens on 10, with the 8 and the 2 marked. After that, the instructions stay in the menu.
 - A decimal row is typed with the phone keyboard or a hardware keyboard. There is no on-screen keypad.
 
-Warm-up, Drill, and Exam pace all use the full byte. Warm-up gives about four seconds before the next row. Drill is tighter. Exam pace is about two seconds, with the place values hidden.
-
-Best score, best pace, and which place values you miss stay in this browser (`localStorage`).
+Best score for each time limit, and which place values you miss, stay in this browser (`localStorage`).
 
 The rules live in `js/binary-logic.js` and do not touch the page, so they can be checked on their own:
 
