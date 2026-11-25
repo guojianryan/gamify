@@ -27,6 +27,8 @@
   var POINTS_MIN = 20;
   var DEFAULT_SOLVE_MS = 5000;
   var BYTE_MAX = 255;
+  var FOUR_BIT_MAX = 15;
+  var SIX_BIT_MAX = 63;
   var BITS_BIAS = 0.5;
 
   function emptyHighScores() {
@@ -116,8 +118,25 @@
       nextId: 1,
       lastValue: null,
       misses: emptyMisses(),
-      guide: false
+      guide: false,
+      spawnedBits: 0,
+      spawnedDecimal: 0
     };
+  }
+
+  function valueCap(state) {
+    var clean = state && state.cleanRows ? state.cleanRows : 0;
+    if (clean < 3) return FOUR_BIT_MAX;
+    if (clean < 6) return SIX_BIT_MAX;
+    return BYTE_MAX;
+  }
+
+  function chooseMode(state, random) {
+    var bits = state.spawnedBits || 0;
+    var decimals = state.spawnedDecimal || 0;
+    if (bits < decimals) return 'bits';
+    if (decimals < bits) return 'decimal';
+    return random() < BITS_BIAS ? 'bits' : 'decimal';
   }
 
   function bitsFor(value) {
@@ -377,16 +396,19 @@
         events: [{ type: 'over', score: state.score, highScore: highScore, endedBy: 'column' }]
       };
     }
-    var value = randomValue(BYTE_MAX, random, state.lastValue);
-    var mode = random() < BITS_BIAS ? 'bits' : 'decimal';
-    // An all-zero bit row would already equal 0, so that draw is typed instead.
-    if (mode === 'bits' && value === 0) mode = 'decimal';
+    var cap = valueCap(state);
+    var value = randomValue(cap, random, state.lastValue);
+    var mode = chooseMode(state, random);
+    // An all-zero bit row would already equal 0, so a bits draw of 0 is a small positive.
+    if (mode === 'bits' && value === 0) value = state.lastValue === 1 && cap > 1 ? 2 : 1;
     var row = blankRow(state.nextId, mode, value, now);
     return {
       state: copyState(state, {
         rows: state.rows.concat(row),
         nextId: state.nextId + 1,
-        lastValue: value
+        lastValue: value,
+        spawnedBits: (state.spawnedBits || 0) + (mode === 'bits' ? 1 : 0),
+        spawnedDecimal: (state.spawnedDecimal || 0) + (mode === 'decimal' ? 1 : 0)
       }),
       events: [{ type: 'spawn', rowId: row.id, mode: mode }]
     };
@@ -399,7 +421,9 @@
         rows: [row],
         nextId: state.nextId + 1,
         lastValue: GUIDE_VALUE,
-        guide: true
+        guide: true,
+        spawnedBits: 1,
+        spawnedDecimal: 0
       }),
       events: [{ type: 'spawn', rowId: row.id, mode: 'bits', guide: true }]
     };
@@ -642,7 +666,9 @@
       nextId: patch.nextId != null ? patch.nextId : state.nextId,
       lastValue: patch.lastValue !== undefined ? patch.lastValue : state.lastValue,
       misses: misses,
-      guide: patch.guide != null ? patch.guide : !!state.guide
+      guide: patch.guide != null ? patch.guide : !!state.guide,
+      spawnedBits: patch.spawnedBits != null ? patch.spawnedBits : (state.spawnedBits || 0),
+      spawnedDecimal: patch.spawnedDecimal != null ? patch.spawnedDecimal : (state.spawnedDecimal || 0)
     };
   }
 

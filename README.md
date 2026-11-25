@@ -19,7 +19,7 @@ An 8-bit conversion drill. Place values sit at the top. The first row is right u
 - The round ends when a new row would be the seventh. The column greys out and a short sound plays.
 - Under each row, the number still left is the target minus what you have selected or typed.
 - A wrong pattern stays on screen with the working written out. One retry on that row scores half, and the spawn clock waits while you read it.
-- There are no levels. Warm-up is eight clean rows at a slow drip, about eight seconds apart. Numbers are an even mix from 0 to 255, and setting bits is as common as reading them.
+- There are no levels. Warm-up is eight clean rows at a slow drip, about eight seconds apart. All eight bits stay on screen. The first three clean rows use numbers up to 15, the next three up to 63, then the rest of warm-up and the race go up to 255. Building a number and reading one stay even.
 - After warm-up, pick a fixed race: 1 minute, 2 minutes, or 5 minutes. The goal is as many points as possible before the clock runs out.
 - A faster clear is worth more. Two seconds or less scores 100. Ten seconds or more scores 20. One retry scores half.
 - After warm-up, the next row arrives a little sooner than the recent clears, so a fast run tightens the column. It never drops below 1.6 seconds or stretches past the warm-up drip.

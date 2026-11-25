@@ -53,7 +53,7 @@ test('a faster clear is worth more, and warm-up stays slow', () => {
   assert.equal(L.limitLabel(120), '2 minutes');
 });
 
-test('a row is an even draw from 0 to 255, both directions, and does not repeat', () => {
+test('numbers stay inside four bits, then six, then 255, and the two directions stay even', () => {
   const started = L.startGame(L.createGame(40), sequence([0.99, 0]), { level: 1 });
   const row = started.state.rows[0];
   assert.equal(started.state.status, 'playing');
@@ -61,30 +61,60 @@ test('a row is an even draw from 0 to 255, both directions, and does not repeat'
   assert.equal(started.state.score, 0);
   assert.equal(started.events[0].type, 'spawn');
   assert.equal(row.mode, 'bits');
-  assert.equal(row.value, Math.floor(0.99 * 256));
-  assert.ok(row.value >= 250);
+  assert.equal(row.value, 15);
+  assert.equal(row.bits.length, 8);
   assert.deepEqual(row.bits, [0, 0, 0, 0, 0, 0, 0, 0]);
 
-  const again = L.spawnRow(started.state, sequence([0.99, 0.9]));
+  const again = L.spawnRow(started.state, sequence([0.99, 0]));
   assert.equal(again.state.rows[1].mode, 'decimal');
   assert.notEqual(again.state.rows[1].value, row.value);
-  assert.ok(again.state.rows[1].value >= 0);
-  assert.ok(again.state.rows[1].value <= 255);
+  assert.ok(again.state.rows[1].value <= 15);
 
   const zero = L.spawnRow(
-    { ...L.createGame(), status: 'playing', level: 1 },
-    sequence([0, 0])
+    { ...L.createGame(), status: 'playing' },
+    sequence([0, 0.9])
   ).state.rows[0];
   assert.equal(zero.value, 0);
   assert.equal(zero.mode, 'decimal');
   assert.deepEqual(zero.bits, L.bitsFor(0));
 
+  const nonzero = L.spawnRow(
+    { ...L.createGame(), status: 'playing' },
+    sequence([0, 0])
+  ).state.rows[0];
+  assert.equal(nonzero.mode, 'bits');
+  assert.equal(nonzero.value, 1);
+  assert.equal(nonzero.bits.length, 8);
+
+  const six = L.spawnRow(
+    { ...L.createGame(), status: 'playing', cleanRows: 3 },
+    sequence([0.99, 0])
+  ).state.rows[0];
+  assert.equal(six.value, 63);
+  assert.ok(six.value <= 63);
+
   const full = L.spawnRow(
-    { ...L.createGame(), status: 'playing', level: 5 },
+    { ...L.createGame(), status: 'playing', cleanRows: 6 },
     sequence([255 / 256, 0.5])
   ).state.rows[0];
   assert.equal(full.value, 255);
   assert.equal(full.mode, 'decimal');
+  assert.equal(full.bits.length, 8);
+
+  let balanced = { ...L.createGame(), status: 'playing', cleanRows: 6 };
+  let bits = 0;
+  let decimals = 0;
+  for (let i = 0; i < L.MAX_ROWS; i += 1) {
+    const draw = i % 2 === 0 ? 0.1 : 0.9;
+    balanced = L.spawnRow(balanced, () => draw).state;
+    const spawned = balanced.rows[i];
+    assert.ok(spawned.value <= 255);
+    assert.equal(spawned.bits.length, 8);
+    if (spawned.mode === 'bits') bits += 1;
+    else decimals += 1;
+  }
+  assert.equal(bits, 3);
+  assert.equal(decimals, 3);
 });
 
 test('a wrong bit stays up with the working, then one retry scores half', () => {
@@ -94,9 +124,9 @@ test('a wrong bit stays up with the working, then one retry scores half', () => 
   state = L.spawnRow(state, rng).state;
   const second = state.rows[1];
   assert.equal(first.mode, 'bits');
-  assert.equal(second.mode, 'bits');
+  assert.equal(second.mode, 'decimal');
   assert.equal(first.value, 1);
-  assert.equal(second.value, 2);
+  assert.equal(second.value, 0);
 
   const early = L.toggleBit(state, first.id, 0);
   assert.equal(early.state.rows.length, 2);
@@ -134,11 +164,16 @@ test('eight clean rows end warm-up, then a timed race keeps the faster score', (
     }
     now += 2000;
     const row = state.rows[0];
-    L.bitsFor(row.value).forEach((bit, index) => {
-      if (!bit) return;
-      last = L.toggleBit(state, row.id, index, now);
+    if (row.mode === 'decimal') {
+      last = L.submitDecimal(L.setDraft(state, row.id, String(row.value)).state, row.id, now);
       state = last.state;
-    });
+    } else {
+      L.bitsFor(row.value).forEach((bit, index) => {
+        if (!bit) return;
+        last = L.toggleBit(state, row.id, index, now);
+        state = last.state;
+      });
+    }
   }
   assert.equal(state.status, 'choose');
   assert.equal(state.racing, false);
@@ -174,7 +209,7 @@ test('eight clean rows end warm-up, then a timed race keeps the faster score', (
 
 test('decimal rows stay until the typed total is right', () => {
   let state = { ...L.createGame(), status: 'playing', level: 5, streak: 4, score: 200 };
-  state = L.spawnRow(state, sequence([0.004, 0.99])).state;
+  state = L.spawnRow(state, sequence([1 / 16, 0.99])).state;
   const row = state.rows[0];
   assert.equal(row.mode, 'decimal');
   assert.equal(row.value, 1);
@@ -273,7 +308,7 @@ test('reading time does not count against a retried clear', () => {
 
 test('a second miss reveals the byte and then leaves', () => {
   let state = { ...L.createGame(), status: 'playing', level: 5, score: 40, streak: 2 };
-  state = L.spawnRow(state, sequence([0.2, 0.99])).state;
+  state = L.spawnRow(state, sequence([0.5, 0.99])).state;
   const row = state.rows[0];
   assert.equal(row.mode, 'decimal');
   state = L.setDraft(state, row.id, '3').state;
