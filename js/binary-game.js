@@ -391,22 +391,37 @@
         }
       }, prefersReducedMotion() ? 0 : CLEAR_MS);
     });
+    var parked = false;
     state.rows.forEach(function (row, index) {
       var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
       if (el && el.dataset.mode !== row.mode) {
         el.remove();
         el = null;
       }
+      var fresh = false;
       if (!el) {
+        if (!parked) {
+          parkRows();
+          parked = true;
+        }
         el = buildRow(row);
         var live = Array.prototype.filter.call(board.children, function (child) {
           return !child.classList.contains('clearing');
         });
         if (live[index]) board.insertBefore(el, live[index]);
         else board.appendChild(el);
-        armDrop(el, board);
+        fresh = true;
       }
+      // Newest row has the lowest order, so it rests above the rows already in play.
+      el.style.order = String(state.rows.length - index);
+      if (fresh) armDrop(el, board);
       updateRow(el, row);
+    });
+  }
+
+  function parkRows() {
+    document.querySelectorAll('#board .row.entering').forEach(function (row) {
+      row.classList.remove('entering', 'frozen');
     });
   }
 
