@@ -1,5 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img">
+  <title>Gamify</title>
+  <!-- Stamp stripe + off/on bit keys reading as 0 and 1. Even coords for crisp 16× tabs. -->
   <rect width="32" height="32" fill="#1b1914"/>
-  <rect x="4" y="8" width="10" height="16" fill="#efe6d6"/>
-  <rect x="18" y="8" width="10" height="16" fill="#1e6a43"/>
+  <rect width="32" height="4" fill="#c4412b"/>
+  <!-- Off bit -->
+  <rect x="2" y="6" width="12" height="24" fill="#efe6d6"/>
+  <!-- Hollow 0 (2px ring, 4px aperture) -->
+  <rect x="4" y="10" width="8" height="16" fill="#1b1914"/>
+  <rect x="6" y="12" width="4" height="12" fill="#efe6d6"/>
+  <!-- On bit -->
+  <rect x="18" y="6" width="12" height="24" fill="#1e6a43"/>
+  <!-- Solid 1 (2px stem) -->
+  <rect x="23" y="10" width="2" height="16" fill="#f4f0e6"/>
 </svg>
