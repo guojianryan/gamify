@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/site.css?v=17">
+  <link rel="stylesheet" href="../css/site.css?v=19">
 </head>
 <body data-status="ready" data-game="binary">
   <a class="skip" href="#board">Skip to the column</a>
@@ -31,7 +31,7 @@
         <div>
           <p class="kicker">8-bit drill</p>
           <h1>Binary game</h1>
-          <p class="deck">Rows stack from the bottom of the well. Set the bits when a decimal is showing, or type the decimal when the bits are already set. The round ends if the stack reaches the top.</p>
+          <p class="deck">Place values sit at the top. The first row is right under them, and new rows are added below. Set the bits when a decimal is showing, or type the decimal when the bits are already set. Six rows fit, and one more arrival ends the round.</p>
         </div>
         <form id="setup-form">
           <p class="pace-note">Warm-up is slow. After eight clean rows, pick 1, 2, or 5 minutes and score as many points as you can. A faster row is worth more, and the next row arrives based on how fast you have been clearing.</p>
@@ -84,8 +84,8 @@
             <div class="meter" aria-hidden="true"><span id="meter"></span></div>
             <p id="guide" class="guide" hidden></p>
             <div class="board-wrap">
-              <div class="board" id="board"></div>
               <div class="ruler" id="ruler"></div>
+              <div class="board" id="board"></div>
               <p class="empty" id="empty"></p>
               <div class="overlay" id="overlay" hidden>
                 <div class="card">
@@ -103,7 +103,7 @@
           <ol>
             <li><strong>Number on the right.</strong> Tap bits until the 1s add up to it. The line under the number is what is still left. The row clears on its own.</li>
             <li><strong>Blank on the right.</strong> The bits are fixed. Tap the box. A keypad pops up. The line shows what is still left, and the row leaves when the number is right. Enter checks it.</li>
-            <li><strong>The well fills from the bottom.</strong> A new row appears above the ones still in play. When the stack reaches the top, the round ends.</li>
+            <li><strong>Rows grow downward.</strong> Place values sit at the top. The first row is right under them, and a new row is added below the ones still in play. Solving a row lets the ones under it move up.</li>
             <li><strong>A miss stays up.</strong> Read the working, then try that row once more.</li>
             <li><strong>The column fills.</strong> Six rows fit. One more arrival ends the round.</li>
             <li><strong>Then the clock.</strong> After warm-up, pick 1, 2, or 5 minutes. Faster clears score more.</li>
@@ -163,6 +163,6 @@
   <p class="sr-only" id="live" aria-live="polite"></p>
   <noscript>This game needs JavaScript.</noscript>
   <script src="../js/binary-logic.js?v=14"></script>
-  <script src="../js/binary-game.js?v=17"></script>
+  <script src="../js/binary-game.js?v=19"></script>
 </body>
 </html>
