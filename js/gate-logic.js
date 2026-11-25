@@ -28,50 +28,52 @@
   var BASE_SCORE = 100;
   var SPEED_BONUS_MAX = 50;
 
-  // Curated puzzles. `ast` is the target expression. `inputs` names the wires.
-  // `band` drives ordering inside a level: 0 easy, 1 medium, 2 hard.
+  // Curated puzzles. Every target uses exactly 3 or 4 gates and 2–3 inputs.
+  // `band` drives ordering inside a level: 0 warm-up, 1 medium, 2 hard.
   // `fastMs` is the gentle speed window for the bonus meter.
   var PUZZLES = Object.freeze([
-    // Level 1 — easy
-    { id: 'l1-and', level: 1, band: 0, inputs: ['A', 'B'], fastMs: 75000, ast: and(inA(), inB()) },
-    { id: 'l1-or', level: 1, band: 0, inputs: ['A', 'B'], fastMs: 75000, ast: or(inA(), inB()) },
-    { id: 'l1-not', level: 1, band: 0, inputs: ['A'], fastMs: 60000, ast: not(inA()) },
-    { id: 'l1-not-b', level: 1, band: 0, inputs: ['A', 'B'], fastMs: 70000, ast: not(inB()) },
-    { id: 'l1-and-c', level: 1, band: 0, inputs: ['A', 'B', 'C'], fastMs: 80000, ast: and(inA(), inC()) },
-    // Level 1 — medium
-    { id: 'l1-not-and', level: 1, band: 1, inputs: ['A', 'B'], fastMs: 90000, ast: not(and(inA(), inB())) },
-    { id: 'l1-not-or', level: 1, band: 1, inputs: ['A', 'B'], fastMs: 90000, ast: not(or(inA(), inB())) },
-    { id: 'l1-and-not', level: 1, band: 1, inputs: ['A', 'B'], fastMs: 90000, ast: and(not(inA()), inB()) },
-    { id: 'l1-or-not', level: 1, band: 1, inputs: ['A', 'B'], fastMs: 90000, ast: or(inA(), not(inB())) },
-    { id: 'l1-a-or-b-and-c', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 100000, ast: or(inA(), and(inB(), inC())) },
-    { id: 'l1-a-and-b-or-c', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 100000, ast: or(and(inA(), inB()), inC()) },
-    { id: 'l1-not-a-or-b', level: 1, band: 1, inputs: ['A', 'B'], fastMs: 90000, ast: or(not(inA()), inB()) },
-    // Level 1 — hard
-    { id: 'l1-demux', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 120000, ast: or(and(inA(), not(inB())), and(not(inA()), inC())) },
-    { id: 'l1-nand-shape', level: 1, band: 2, inputs: ['A', 'B'], fastMs: 110000, ast: or(not(inA()), not(inB())) },
-    { id: 'l1-nor-shape', level: 1, band: 2, inputs: ['A', 'B'], fastMs: 110000, ast: and(not(inA()), not(inB())) },
-    { id: 'l1-triple', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 120000, ast: and(or(inA(), inB()), not(inC())) },
-    { id: 'l1-nested', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: not(or(and(inA(), inB()), inC())) },
-    { id: 'l1-xor-shape', level: 1, band: 2, inputs: ['A', 'B'], fastMs: 120000, ast: or(and(inA(), not(inB())), and(not(inA()), inB())) },
-    // Level 2 — easy
-    { id: 'l2-xor', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 80000, ast: xor(inA(), inB()) },
-    { id: 'l2-nand', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 80000, ast: nand(inA(), inB()) },
-    { id: 'l2-nor', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 80000, ast: nor(inA(), inB()) },
-    { id: 'l2-not-xor', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 90000, ast: not(xor(inA(), inB())) },
-    // Level 2 — medium
-    { id: 'l2-xor-c', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 100000, ast: or(xor(inA(), inB()), inC()) },
-    { id: 'l2-nand-or', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 100000, ast: or(nand(inA(), inB()), inC()) },
-    { id: 'l2-nor-and', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 100000, ast: and(nor(inA(), inB()), inC()) },
-    { id: 'l2-xor-and', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 110000, ast: and(xor(inA(), inB()), inC()) },
-    { id: 'l2-nand-not', level: 2, band: 1, inputs: ['A', 'B'], fastMs: 95000, ast: nand(not(inA()), inB()) },
-    { id: 'l2-a-xor-not-b', level: 2, band: 1, inputs: ['A', 'B'], fastMs: 95000, ast: xor(inA(), not(inB())) },
-    // Level 2 — hard
-    { id: 'l2-mux', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: or(and(inA(), not(inC())), and(inB(), inC())) },
-    { id: 'l2-xor-nand', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: xor(nand(inA(), inB()), inC()) },
-    { id: 'l2-nor-xor', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: nor(xor(inA(), inB()), inC()) },
-    { id: 'l2-nested', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 140000, ast: nand(or(inA(), inB()), xor(inB(), inC())) },
-    { id: 'l2-de-morgan', level: 2, band: 2, inputs: ['A', 'B'], fastMs: 120000, ast: nor(not(inA()), not(inB())) },
-    { id: 'l2-chain', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 140000, ast: xor(and(inA(), inB()), nor(inB(), inC())) }
+    // Level 1 — warm-up (3 gates)
+    { id: 'l1-not-and-or', level: 1, band: 0, inputs: ['A', 'B'], fastMs: 100000, ast: or(not(and(inA(), inB())), inB()) },
+    { id: 'l1-or-and-not', level: 1, band: 0, inputs: ['A', 'B', 'C'], fastMs: 110000, ast: and(or(inA(), inB()), not(inC())) },
+    { id: 'l1-not-or-and', level: 1, band: 0, inputs: ['A', 'B', 'C'], fastMs: 110000, ast: or(not(inA()), and(inB(), inC())) },
+    { id: 'l1-and-or-not', level: 1, band: 0, inputs: ['A', 'B', 'C'], fastMs: 110000, ast: and(or(inA(), not(inB())), inC()) },
+    { id: 'l1-de-morgan-or', level: 1, band: 0, inputs: ['A', 'B'], fastMs: 105000, ast: or(not(inA()), not(inB())) },
+    { id: 'l1-de-morgan-and', level: 1, band: 0, inputs: ['A', 'B'], fastMs: 105000, ast: and(not(inA()), not(inB())) },
+    // Level 1 — medium (3–4 gates)
+    { id: 'l1-nested-not', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: not(or(and(inA(), inB()), inC())) },
+    { id: 'l1-or-not-and', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 125000, ast: or(and(not(inA()), inB()), not(inC())) },
+    { id: 'l1-chain-or', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: or(and(inA(), inB()), and(not(inB()), inC())) },
+    { id: 'l1-not-and-not', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 130000, ast: and(not(or(inA(), inB())), not(inC())) },
+    { id: 'l1-and-not-c', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 125000, ast: and(or(inA(), inB()), and(not(inB()), inC())) },
+    { id: 'l1-or-not-b', level: 1, band: 1, inputs: ['A', 'B', 'C'], fastMs: 125000, ast: or(and(inA(), not(inB())), inC()) },
+    // Level 1 — hard (4 gates)
+    { id: 'l1-mux-lite', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 145000, ast: or(and(inA(), not(inC())), and(inB(), inC())) },
+    { id: 'l1-split-b', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 145000, ast: or(and(inA(), not(inB())), and(inB(), inC())) },
+    { id: 'l1-nest-not-or', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 150000, ast: not(or(and(inA(), inB()), and(inA(), inC()))) },
+    { id: 'l1-and-or-not-c', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 145000, ast: and(or(not(inA()), inB()), not(inC())) },
+    { id: 'l1-or-and-not-c', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 145000, ast: or(and(not(inA()), inB()), not(inC())) },
+    { id: 'l1-deep-not', level: 1, band: 2, inputs: ['A', 'B', 'C'], fastMs: 150000, ast: not(and(or(inA(), inB()), or(inB(), inC()))) },
+    // Level 2 — warm-up (3 gates, introduce extras)
+    { id: 'l2-xor-not-or', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 115000, ast: or(not(xor(inA(), inB())), inB()) },
+    { id: 'l2-nand-or-not', level: 2, band: 0, inputs: ['A', 'B', 'C'], fastMs: 120000, ast: or(nand(inA(), inB()), not(inC())) },
+    { id: 'l2-nor-and-not', level: 2, band: 0, inputs: ['A', 'B', 'C'], fastMs: 120000, ast: and(nor(inA(), inB()), not(inC())) },
+    { id: 'l2-xor-and-not', level: 2, band: 0, inputs: ['A', 'B', 'C'], fastMs: 120000, ast: and(xor(inA(), inB()), not(inC())) },
+    { id: 'l2-nand-nots', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 115000, ast: nand(not(inA()), not(inB())) },
+    { id: 'l2-nor-nots', level: 2, band: 0, inputs: ['A', 'B'], fastMs: 115000, ast: nor(not(inA()), not(inB())) },
+    // Level 2 — medium (3–4 gates)
+    { id: 'l2-xor-nand-not', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 140000, ast: xor(nand(inA(), inB()), not(inC())) },
+    { id: 'l2-nor-xor-not', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 140000, ast: nor(xor(inA(), inB()), not(inC())) },
+    { id: 'l2-mux', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 145000, ast: or(and(inA(), not(inC())), and(inB(), inC())) },
+    { id: 'l2-nand-xor-not', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 140000, ast: nand(xor(inA(), inB()), not(inC())) },
+    { id: 'l2-or-nor-not', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 135000, ast: or(nor(inA(), inB()), not(inC())) },
+    { id: 'l2-and-xor-not', level: 2, band: 1, inputs: ['A', 'B', 'C'], fastMs: 135000, ast: and(xor(inA(), not(inB())), inC()) },
+    // Level 2 — hard (3–4 gates)
+    { id: 'l2-nested', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 155000, ast: nand(or(inA(), inB()), xor(inB(), inC())) },
+    { id: 'l2-chain', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 155000, ast: xor(and(inA(), inB()), nor(inB(), inC())) },
+    { id: 'l2-de-morgan', level: 2, band: 2, inputs: ['A', 'B'], fastMs: 140000, ast: nor(not(inA()), not(inB())) },
+    { id: 'l2-parity', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 155000, ast: xor(xor(inA(), inB()), not(inC())) },
+    { id: 'l2-select', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 160000, ast: or(and(nand(inA(), inB()), inC()), not(inA())) },
+    { id: 'l2-deep', level: 2, band: 2, inputs: ['A', 'B', 'C'], fastMs: 160000, ast: nor(xor(inA(), not(inB())), nand(inB(), inC())) }
   ]);
 
   function inA() { return { type: 'input', name: 'A' }; }
@@ -224,6 +226,15 @@
   function outermostOp(ast) {
     if (!ast || ast.type !== 'gate') return null;
     return ast.op;
+  }
+
+  function countGates(ast) {
+    if (!ast || ast.type !== 'gate') return 0;
+    var total = 1;
+    (ast.inputs || []).forEach(function (child) {
+      total += countGates(child);
+    });
+    return total;
   }
 
   function pathGet(ast, path) {
@@ -508,6 +519,7 @@
     compareBehaviour: compareBehaviour,
     formatAst: formatAst,
     outermostOp: outermostOp,
+    countGates: countGates,
     pathGet: pathGet,
     pathSet: pathSet,
     makeGateNode: makeGateNode,
