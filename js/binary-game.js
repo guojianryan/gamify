@@ -164,6 +164,7 @@
     if (row && input.value !== row.draft) input.value = row.draft;
     input.classList.remove('wrong');
     input.removeAttribute('aria-invalid');
+    if (row) paintRemainder(input.closest('.row'), row);
   }
 
   function onDraftKeydown(event) {
@@ -431,6 +432,9 @@
       sum.className = 'sum';
       ticket.append(strong, sum);
     } else {
+      var left = document.createElement('span');
+      left.className = 'left';
+      left.hidden = true;
       var input = document.createElement('input');
       input.type = 'text';
       input.inputMode = 'numeric';
@@ -446,7 +450,7 @@
         selectedId = Number(el.dataset.id);
         paintSelection();
       });
-      ticket.appendChild(input);
+      ticket.append(input, left);
     }
     el.appendChild(ticket);
     var lesson = document.createElement('p');
@@ -462,7 +466,7 @@
     el.classList.toggle('selected', row.id === selectedId);
     el.classList.toggle('teaching', teaching);
     var label = row.mode === 'bits'
-      ? 'Set the bits to equal ' + row.value
+      ? 'Set the bits to equal ' + row.value + '. ' + leftLabel(logic.remaining(row.value, logic.valueOf(row.bits)))
       : 'Type the decimal value of these bits';
     if (row.feedback && teaching) label = row.feedback;
     el.setAttribute('aria-label', label);
@@ -490,18 +494,10 @@
     }
     if (row.mode === 'bits') {
       el.querySelector('.target').textContent = String(row.value);
-      var sum = el.querySelector('.sum');
-      if (coach) {
-        var total = logic.valueOf(row.bits);
-        sum.hidden = false;
-        sum.textContent = String(total);
-        sum.classList.toggle('over', total > row.value);
-      } else {
-        sum.textContent = '';
-        sum.hidden = true;
-      }
+      paintRemainder(el, row);
     } else {
       var input = el.querySelector('input');
+      paintRemainder(el, row);
       input.disabled = state.status !== 'playing' || row.phase !== 'play';
       if (input.value !== row.draft && (document.activeElement !== input || input.disabled)) {
         input.value = row.draft;
@@ -527,6 +523,8 @@
     var nearlyFull = state.status === 'playing' && state.rows.length >= logic.MAX_ROWS - 1;
     playfield.classList.toggle('danger', nearlyFull);
     playfield.classList.toggle('full', state.status === 'playing' && state.rows.length >= logic.MAX_ROWS);
+    playfield.classList.toggle('ended', state.status === 'over');
+    playfield.classList.toggle('topout', state.status === 'over' && state.endedBy === 'column');
     var guide = document.getElementById('guide');
     var showGuide = !!(state.guide && (state.status === 'playing' || state.status === 'paused'));
     guide.hidden = !showGuide;
@@ -1026,7 +1024,42 @@
     try { localStorage.setItem(key, value); } catch (error) { /* ignore full or private storage */ }
   }
 
-  function tone(frequency, offset, duration, type) {
+  function paintRemainder(el, row) {
+    if (!el || !row) return;
+    if (row.mode === 'bits') {
+      var total = logic.valueOf(row.bits);
+      var left = logic.remaining(row.value, total);
+      var sum = el.querySelector('.sum');
+      if (!sum) return;
+      sum.hidden = false;
+      sum.textContent = (coach ? total + ' · ' : '') + leftLabel(left);
+      sum.classList.toggle('over', left < 0);
+      sum.classList.toggle('exact', left === 0);
+      return;
+    }
+    var note = el.querySelector('.left');
+    if (!note) return;
+    var typed = row.draft === '' ? null : Number(row.draft);
+    if (typed == null || !Number.isInteger(typed)) {
+      note.hidden = true;
+      note.textContent = '';
+      note.classList.remove('over', 'exact');
+      return;
+    }
+    var gap = logic.remaining(row.value, typed);
+    note.hidden = false;
+    note.textContent = leftLabel(gap);
+    note.classList.toggle('over', gap < 0);
+    note.classList.toggle('exact', gap === 0);
+  }
+
+  function leftLabel(left) {
+    if (left > 0) return left + ' left';
+    if (left < 0) return Math.abs(left) + ' over';
+    return '0 left';
+  }
+
+  function tone(frequency, offset, duration, type, level) {
     var context = audio();
     if (!context) return;
     var osc = context.createOscillator();
@@ -1034,8 +1067,9 @@
     osc.type = type || 'square';
     osc.frequency.value = frequency;
     var start = context.currentTime + offset;
+    var peak = level || 0.045;
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.045, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     osc.connect(gain);
     gain.connect(context.destination);
@@ -1064,7 +1098,8 @@
     tone(784, 0.16, 0.12, 'triangle');
   }
   function soundOver() {
-    tone(196, 0, 0.18, 'triangle');
-    tone(130, 0.1, 0.26, 'triangle');
+    tone(349, 0, 0.16, 'square', 0.07);
+    tone(262, 0.14, 0.18, 'square', 0.07);
+    tone(196, 0.3, 0.32, 'triangle', 0.09);
   }
 })();

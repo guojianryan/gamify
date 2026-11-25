@@ -31,7 +31,7 @@
         <div>
           <p class="kicker">8-bit drill</p>
           <h1>Binary game</h1>
-          <p class="deck">Rows fill the column from the top. Set the bits when a decimal is showing, or type the decimal when the bits are already set. Clear a row before the column is full.</p>
+          <p class="deck">Rows stack from the bottom of the well. Set the bits when a decimal is showing, or type the decimal when the bits are already set. The round ends if the stack reaches the top.</p>
         </div>
         <form id="setup-form">
           <p class="pace-note">Warm-up is slow. After eight clean rows, pick 1, 2, or 5 minutes and score as many points as you can. A faster row is worth more, and the next row arrives based on how fast you have been clearing.</p>
@@ -101,8 +101,9 @@
         <div class="howto" id="howto" hidden>
           <h2>How a row works</h2>
           <ol>
-            <li><strong>Number on the right.</strong> Tap bits until the 1s add up to it. The row clears on its own.</li>
-            <li><strong>Blank on the right.</strong> The bits are fixed. Tap the box and type their total with the keyboard, then press Enter.</li>
+            <li><strong>Number on the right.</strong> Tap bits until the 1s add up to it. The line under the number is what is still left. The row clears on its own.</li>
+            <li><strong>Blank on the right.</strong> The bits are fixed. Tap the box and type their total. Once you type, the line shows what is still left. Enter submits.</li>
+            <li><strong>The well fills from the bottom.</strong> Empty space stays at the top. When the stack reaches it, the round ends.</li>
             <li><strong>A miss stays up.</strong> Read the working, then try that row once more.</li>
             <li><strong>The column fills.</strong> Six rows fit. One more arrival ends the round.</li>
             <li><strong>Then the clock.</strong> After warm-up, pick 1, 2, or 5 minutes. Faster clears score more.</li>
