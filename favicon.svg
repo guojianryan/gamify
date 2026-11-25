@@ -1,14 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img">
   <title>Gamify</title>
-  <!-- Bold G monogram: stamp stripe, cream letter, moss counter accent -->
-  <rect width="32" height="32" fill="#1b1914"/>
-  <rect width="32" height="4" fill="#c4412b"/>
-  <!-- G: top, left, bottom, right spur, tongue -->
-  <rect x="6" y="8" width="20" height="4" fill="#efe6d6"/>
-  <rect x="6" y="8" width="4" height="20" fill="#efe6d6"/>
-  <rect x="6" y="24" width="20" height="4" fill="#efe6d6"/>
-  <rect x="22" y="16" width="4" height="12" fill="#efe6d6"/>
-  <rect x="14" y="16" width="12" height="4" fill="#efe6d6"/>
-  <!-- Moss bit in the open counter -->
-  <rect x="12" y="12" width="8" height="4" fill="#1e6a43"/>
+  <!-- Ticket stamp: cream field, terracotta ring, moss disc, cream play mark -->
+  <rect width="32" height="32" fill="#f7f1e6"/>
+  <circle cx="16" cy="16" r="14" fill="#c4412b"/>
+  <circle cx="16" cy="16" r="11.25" fill="#f7f1e6"/>
+  <circle cx="16" cy="16" r="9.5" fill="#1e6a43"/>
+  <!-- Play triangle -->
+  <path fill="#f7f1e6" d="M13 10.5v11l9-5.5z"/>
 </svg>
