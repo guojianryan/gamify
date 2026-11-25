@@ -15,7 +15,7 @@ Then visit `/`, `/binary/`, and `/gates/`.
 An 8-bit conversion drill. Rows stack from the bottom of a six-row well, and the round ends when they reach the top.
 
 - A decimal on the right means you click bits until the 1s add up to it. The row clears on its own.
-- Bits already set, with a blank on the right, means you type the decimal and press Enter.
+- Bits already set, with a blank on the right, means you type the decimal. The row leaves when the number is right. Enter checks a wrong number.
 - The round ends when a new row would reach the top of the well. The well greys out and a short sound plays.
 - Under each row, the number still left is the target minus what you have selected or typed.
 - A wrong pattern stays on screen with the working written out. One retry on that row scores half, and the spawn clock waits while you read it.
@@ -24,7 +24,7 @@ An 8-bit conversion drill. Rows stack from the bottom of a six-row well, and the
 - A faster clear is worth more. Two seconds or less scores 100. Ten seconds or more scores 20. One retry scores half.
 - After warm-up, the next row arrives a little sooner than the recent clears, so a fast run tightens the column. It never drops below 1.6 seconds or stretches past the warm-up drip.
 - The first visit opens on 10, with the 8 and the 2 marked. After that, the instructions stay in the menu.
-- A decimal row is typed with the phone keyboard or a hardware keyboard. There is no on-screen keypad.
+- Focusing a decimal box pops up an on-screen keypad with an Enter key. A hardware keyboard still works.
 
 Best score for each time limit, and which place values you miss, stay in this browser (`localStorage`).
 
