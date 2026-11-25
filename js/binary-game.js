@@ -30,6 +30,7 @@
   var holds = {};
   var swallowClick = false;
   var menuOpen = false;
+  var pendingFocusId = null;
 
   var coachBox = document.getElementById('coach');
   var valuesBox = document.getElementById('force-values');
@@ -79,12 +80,6 @@
       storageSet('gamify.binary.forceValues', forceValues ? '1' : '0');
       render();
     });
-    document.getElementById('keypad').addEventListener('pointerdown', function (event) {
-      if (event.pointerType === 'mouse' && event.target.closest('button')) {
-        event.preventDefault();
-      }
-    });
-    document.getElementById('keypad').addEventListener('click', onKeypad);
     document.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('click', onSwallowClick, true);
     document.addEventListener('keydown', onKeydown);
@@ -175,17 +170,6 @@
     if (input && event.target !== input) input.focus();
   }
 
-  function onKeypad(event) {
-    var key = event.target.closest('[data-key]');
-    if (!key || state.status !== 'playing' || key.disabled) return;
-    if (heldRows().length) return;
-    var name = key.dataset.key;
-    if (name === 'enter') submitSelected();
-    else if (name === 'clear') writeDraft('');
-    else if (name === 'back') backspace();
-    else appendDigit(name);
-  }
-
   function onPointerDown(event) {
     if (!heldRows().length || state.status !== 'playing') return;
     if (event.target.closest && event.target.closest('#menu-panel, #menu-toggle')) return;
@@ -258,48 +242,6 @@
     else syncSpawnClock();
   }
 
-  function appendDigit(digit) {
-    var row = decimalTarget();
-    if (!row || row.phase !== 'play') return;
-    selectedId = row.id;
-    state = logic.setDraft(state, row.id, row.draft + digit).state;
-    render();
-    focusInput(row.id);
-  }
-
-  function backspace() {
-    var row = decimalTarget();
-    if (!row || row.phase !== 'play') return;
-    selectedId = row.id;
-    state = logic.setDraft(state, row.id, row.draft.slice(0, -1)).state;
-    render();
-    focusInput(row.id);
-  }
-
-  function writeDraft(value) {
-    var row = decimalTarget();
-    if (!row || row.phase !== 'play') return;
-    selectedId = row.id;
-    state = logic.setDraft(state, row.id, value).state;
-    render();
-    focusInput(row.id);
-  }
-
-  function submitSelected() {
-    var row = decimalTarget();
-    if (!row || row.phase !== 'play') return;
-    selectedId = row.id;
-    onSubmit(row.id);
-  }
-
-  function decimalTarget() {
-    var selected = state.rows.find(function (row) {
-      return row.id === selectedId && row.mode === 'decimal';
-    });
-    if (selected) return selected;
-    return state.rows.find(function (row) { return row.mode === 'decimal'; }) || null;
-  }
-
   function selectedPlayable() {
     var selected = findRow(selectedId);
     if (selected) return selected;
@@ -330,6 +272,15 @@
     syncSpawnClock();
     paintMeter();
     maybeWarn();
+    if (pendingFocusId != null) {
+      var focusId = pendingFocusId;
+      pendingFocusId = null;
+      if (state.status === 'playing' && findRow(focusId)) {
+        selectedId = focusId;
+        paintSelection();
+        focusInput(focusId);
+      }
+    }
   }
 
   function renderHud() {
@@ -451,6 +402,7 @@
       var input = document.createElement('input');
       input.type = 'text';
       input.inputMode = 'numeric';
+      input.enterKeyHint = 'done';
       input.maxLength = 3;
       input.autocomplete = 'off';
       input.spellcheck = false;
@@ -564,10 +516,6 @@
       empty.textContent = 'Column clear.';
     }
     document.getElementById('pressure').textContent = pressureText();
-    var keypad = document.getElementById('keypad');
-    keypad.querySelectorAll('button').forEach(function (button) {
-      button.disabled = state.status !== 'playing';
-    });
     document.getElementById('start').textContent = state.status === 'over' ? 'Play again' : 'Start';
   }
 
@@ -621,6 +569,7 @@
     var multiplier = 1;
     var paceEvent = null;
     events.forEach(function (event) {
+      if (event.type === 'spawn' && event.mode === 'decimal') pendingFocusId = event.rowId;
       if (event.type === 'solved') {
         gained += event.gained;
         multiplier = event.multiplier || 1;
@@ -908,7 +857,6 @@
   function gameKeyContext(target) {
     if (!target || !target.closest) return true;
     if (target.closest('#setup-form')) return false;
-    if (target.closest('#keypad')) return false;
     if (target.closest('button') && !target.closest('#board')) return false;
     if (target.matches('input[type="checkbox"], input[type="radio"]')) return false;
     return true;
