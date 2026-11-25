@@ -1490,6 +1490,10 @@ body.keypad-open {
   overflow: hidden;
 }
 
+.circuit-board.picking {
+  min-height: 340px;
+}
+
 .circuit-scroll {
   display: flex;
   flex-wrap: nowrap;
@@ -1679,12 +1683,17 @@ body.keypad-open {
   border: 1.5px solid var(--ink);
   background: rgba(247, 241, 230, 0.97);
   box-shadow: 4px 4px 0 var(--ink);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(100% - 16px);
 }
 
 .picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 6px;
+  flex: 0 0 auto;
 }
 
 .picker-grid button {
@@ -1695,6 +1704,47 @@ body.keypad-open {
   font-size: 0.9rem;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  .circuit-board {
+    min-height: 300px;
+  }
+
+  .picker {
+    inset: 6px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .picker-grid button {
+    min-height: 40px;
+    font-size: 0.84rem;
+  }
+
+  .palette .chip {
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+  }
+
+  .bench-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bench-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bench-actions #check {
+    grid-column: 1 / -1;
+  }
 }
 
 .picker-grid button:hover {
