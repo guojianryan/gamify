@@ -18,6 +18,14 @@ function solveBits(state) {
   return next;
 }
 
+test('the number left is the target minus what is selected', () => {
+  assert.equal(L.remaining(18, 12), 6);
+  assert.equal(L.remaining(18, 0), 18);
+  assert.equal(L.remaining(18, 18), 0);
+  assert.equal(L.remaining(18, 22), -4);
+  assert.equal(L.remaining(15, 12), 3);
+});
+
 test('every byte round-trips through the place values', () => {
   for (let n = 0; n <= 255; n += 1) {
     assert.equal(L.valueOf(L.bitsFor(n)), n);

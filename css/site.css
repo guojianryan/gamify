@@ -421,11 +421,18 @@ button.bit:not(:disabled):hover {
   line-height: 1;
 }
 
-.sum {
+.sum,
+.left {
   min-height: 1em;
   font-family: var(--mono);
-  font-size: 1.05rem;
-  color: var(--ink-soft);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sum.exact,
+.left.exact {
+  color: var(--moss-ink);
 }
 
 .sum.over {
@@ -453,7 +460,7 @@ button.bit:not(:disabled):hover {
 }
 
 .row.entering {
-  animation: rise 160ms ease-out;
+  animation: drop 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .row.shake {
@@ -795,15 +802,51 @@ body:not([data-status="playing"]) .meter {
 }
 
 .board {
+  --slot: 96px;
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 8px;
-  min-height: 404px;
+  min-height: calc(6 * var(--slot) + 5 * 8px);
 }
 
-body:not([data-status="playing"]):not([data-status="paused"]) .board {
+body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]) .board {
   min-height: 96px;
+  justify-content: flex-start;
+}
+
+.play.topout .board {
+  animation: well-hit 640ms ease;
+}
+
+.play.topout .board::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 6px;
+  background: var(--stamp);
+  animation: top-flash 640ms ease;
+}
+
+.play.ended {
+  position: relative;
+}
+
+.play.ended::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: rgba(74, 70, 64, 0.52);
+  pointer-events: none;
+  animation: grey-in 480ms ease;
+}
+
+.play.ended .board {
+  filter: grayscale(0.9);
 }
 
 .empty {
@@ -966,15 +1009,33 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
   border: 0;
 }
 
-@keyframes rise {
+@keyframes drop {
   from {
-    opacity: 0;
-    transform: translateY(8px);
+    opacity: 0.4;
+    transform: translateY(calc(-5 * var(--slot, 96px)));
   }
   to {
     opacity: 1;
     transform: none;
   }
+}
+
+@keyframes well-hit {
+  0%, 100% { transform: none; }
+  18% { transform: translateY(-10px); }
+  36% { transform: translateY(4px); }
+  54% { transform: translateY(-5px); }
+  72% { transform: translateY(2px); }
+}
+
+@keyframes top-flash {
+  0%, 100% { opacity: 0; }
+  25%, 55% { opacity: 1; }
+}
+
+@keyframes grey-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes shake {
@@ -993,7 +1054,7 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 @keyframes clear-row {
   to {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: scale(0.96);
   }
 }
 
@@ -1049,9 +1110,15 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
     font-size: 2.15rem;
   }
 
-  .board,
-  body:not([data-status="playing"]):not([data-status="paused"]) .board {
+  .board {
+    --slot: 84px;
+    gap: 4px;
+    min-height: calc(6 * var(--slot) + 5 * 4px);
+  }
+
+  body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]) .board {
     min-height: 0;
+    justify-content: flex-start;
   }
 
   .guide {

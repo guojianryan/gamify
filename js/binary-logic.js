@@ -127,6 +127,10 @@
     });
   }
 
+  function remaining(target, current) {
+    return (target | 0) - (current | 0);
+  }
+
   function valueOf(bits) {
     return BIT_VALUES.reduce(function (sum, bit, index) {
       return sum + (bits[index] ? bit : 0);
@@ -663,6 +667,7 @@
     resumeGame: resumeGame,
     bitsFor: bitsFor,
     valueOf: valueOf,
+    remaining: remaining,
     expression: expression,
     pointsForTime: pointsForTime,
     partialForTime: partialForTime,
