@@ -29,7 +29,6 @@
   var holds = {};
   var swallowClick = false;
   var menuOpen = false;
-  var pendingFocusId = null;
   var raceClock = 0;
   var raceEndsAt = 0;
 
@@ -104,6 +103,7 @@
     document.getElementById('board').replaceChildren();
     applyEvents(started.events);
     render();
+    focusSelected();
   }
 
   function onPause() {
@@ -132,6 +132,7 @@
     document.getElementById('board').replaceChildren();
     applyEvents(started.events);
     render();
+    focusSelected();
   }
 
   function onToggle(id, index) {
@@ -145,6 +146,7 @@
     if (wasGuide && !state.guide && state.status === 'playing') spawnFollowUp();
     render();
     afterEvents(result.events);
+    if (solved) focusSelected();
   }
 
   function onSubmit(id) {
@@ -153,7 +155,7 @@
     applyEvents(result.events);
     render();
     afterEvents(result.events);
-    if (result.result === 'correct') focusNextDecimal();
+    if (result.result === 'correct') focusSelected();
   }
 
   function onDraftInput(event) {
@@ -373,12 +375,15 @@
     });
   }
 
-  function focusNextDecimal() {
-    var next = state.rows.find(function (row) { return row.mode === 'decimal' && row.phase === 'play'; });
-    if (!next) return;
-    selectedId = next.id;
-    paintSelection();
-    focusInput(next.id);
+  function focusSelected() {
+    if (state.status !== 'playing') return;
+    var row = findRow(selectedId);
+    if (row && row.mode === 'decimal' && row.phase === 'play') {
+      focusInput(row.id);
+      return;
+    }
+    var active = document.activeElement;
+    if (active && active.matches && active.matches('#board .row input')) active.blur();
   }
 
   function render() {
@@ -393,15 +398,6 @@
     paintMeter();
     maybeWarn();
     syncKeypad();
-    if (pendingFocusId != null) {
-      var focusId = pendingFocusId;
-      pendingFocusId = null;
-      if (state.status === 'playing' && findRow(focusId)) {
-        selectedId = focusId;
-        paintSelection();
-        focusInput(focusId);
-      }
-    }
   }
 
   function renderHud() {
@@ -724,7 +720,6 @@
     var chose = false;
     var raceLimit = 0;
     events.forEach(function (event) {
-      if (event.type === 'spawn' && event.mode === 'decimal') pendingFocusId = event.rowId;
       if (event.type === 'solved') {
         gained += event.gained;
         multiplier = event.multiplier || 1;

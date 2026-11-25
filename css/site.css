@@ -466,8 +466,13 @@ button.bit:not(:disabled):hover {
 }
 
 .row.clearing {
-  animation: clear-row 450ms ease forwards;
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
   pointer-events: none;
+  animation: none;
 }
 
 .lesson {
