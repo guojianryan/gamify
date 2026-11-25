@@ -352,6 +352,10 @@ a.button.secondary {
   text-align: center;
 }
 
+body[data-game="binary"] .ruler {
+  margin: 0 0 8px;
+}
+
 .ruler .place[data-hidden="true"],
 .ruler .eq[data-hidden="true"] {
   color: transparent;
@@ -823,19 +827,13 @@ body:not([data-status="playing"]) .meter {
 }
 
 .board {
-  --slot: 96px;
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 8px;
-  min-height: calc(6 * var(--slot) + 5 * 8px);
-  overflow: hidden;
-}
-
-body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]):not([data-status="over"]) .board {
-  min-height: 96px;
   justify-content: flex-start;
+  gap: 8px;
+  min-height: 0;
+  overflow: visible;
 }
 
 .play.topout .board {
@@ -872,10 +870,6 @@ body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="
 }
 
 .empty {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 40px;
   margin: 0;
   color: var(--ink-soft);
 }
@@ -1171,14 +1165,7 @@ body.keypad-open {
   }
 
   .board {
-    --slot: 84px;
     gap: 4px;
-    min-height: calc(6 * var(--slot) + 5 * 4px);
-  }
-
-  body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]):not([data-status="over"]) .board {
-    min-height: 0;
-    justify-content: flex-start;
   }
 
   .guide {

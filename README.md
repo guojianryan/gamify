@@ -12,11 +12,11 @@ Then visit `/`, `/binary/`, and `/gates/`.
 
 ## Binary game
 
-An 8-bit conversion drill. Rows stack from the bottom of a six-row well, and the round ends when they reach the top.
+An 8-bit conversion drill. The first row sits under the place values, and new rows are added below it. Solving a row lets the ones under it move up. A seventh row ends the round.
 
 - A decimal on the right means you click bits until the 1s add up to it. The row clears on its own.
 - Bits already set, with a blank on the right, means you type the decimal. The row leaves when the number is right. Enter checks a wrong number.
-- The round ends when a new row would reach the top of the well. The well greys out and a short sound plays.
+- The round ends when a new row would be the seventh. The column greys out and a short sound plays.
 - Under each row, the number still left is the target minus what you have selected or typed.
 - A wrong pattern stays on screen with the working written out. One retry on that row scores half, and the spawn clock waits while you read it.
 - There are no levels. Warm-up is eight clean rows at a slow drip, about eight seconds apart. Numbers are an even mix from 0 to 255, and setting bits is as common as reading them.

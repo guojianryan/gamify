@@ -342,20 +342,12 @@
   function keepInputVisible(input) {
     var pad = document.getElementById('keypad');
     var padTop = pad && !pad.hidden ? pad.getBoundingClientRect().top : window.innerHeight;
-    var ruler = document.querySelector('.ruler');
-    var rowRect = input.getBoundingClientRect();
-    var bottom = ruler ? ruler.getBoundingClientRect().bottom : rowRect.bottom;
+    var row = input.closest('.row');
+    var rect = row ? row.getBoundingClientRect() : input.getBoundingClientRect();
     var margin = 12;
-    var room = padTop - margin * 2;
     var delta = 0;
-    if (bottom - rowRect.top <= room) {
-      if (bottom > padTop - margin) delta = bottom - (padTop - margin);
-      else if (rowRect.top < margin) delta = rowRect.top - margin;
-    } else if (rowRect.bottom > padTop - margin) {
-      delta = rowRect.bottom - (padTop - margin);
-    } else if (rowRect.top < margin) {
-      delta = rowRect.top - margin;
-    }
+    if (rect.bottom > padTop - margin) delta = rect.bottom - (padTop - margin);
+    else if (rect.top < margin) delta = rect.top - margin;
     if (!delta) return;
     var root = document.documentElement;
     var previous = root.style.scrollBehavior;
@@ -475,6 +467,7 @@
     var keep = new Set(state.rows.map(function (row) { return String(row.id); }));
     Array.prototype.forEach.call(Array.from(board.children), function (child) {
       if (keep.has(child.dataset.id) || child.classList.contains('clearing')) return;
+      child.classList.remove('selected');
       child.classList.add('clearing');
       window.setTimeout(function () {
         if (child.parentNode) child.remove();
@@ -492,21 +485,10 @@
       }
       if (!el) {
         el = buildRow(row);
-        placeAbove(board, el, row.id);
+        board.appendChild(el);
       }
       updateRow(el, row);
     });
-  }
-
-  // Newest id goes first in the column, which puts it above the rows already there.
-  function placeAbove(board, el, rowId) {
-    var older = null;
-    Array.prototype.forEach.call(board.children, function (child) {
-      if (older || child.classList.contains('clearing') || child === el) return;
-      if (Number(child.dataset.id) < rowId) older = child;
-    });
-    if (older) board.insertBefore(el, older);
-    else board.appendChild(el);
   }
 
   function buildRow(row) {
@@ -641,7 +623,7 @@
       empty.textContent = 'Warm-up. The next row is on the way.';
     } else if (state.status === 'ready') {
       empty.textContent = storageGet(GUIDE_KEY) === '1'
-        ? 'Press start. The first row appears at the bottom of the well.'
+        ? 'Press start. The first row appears under the place values.'
         : 'Press start. The first row shows you which bits to tap.';
     } else {
       empty.textContent = 'Column clear.';
