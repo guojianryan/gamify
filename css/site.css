@@ -460,10 +460,16 @@ button.bit:not(:disabled):hover {
 }
 
 .row.entering {
-  animation: settle 180ms ease-out;
+  z-index: 2;
+  animation: drop var(--drop-ms, 8000ms) linear both;
 }
 
-.row.shake {
+.row.entering.frozen {
+  animation-play-state: paused;
+}
+
+.row.shake .bit,
+.row.shake .ticket {
   animation: shake 180ms ease;
 }
 
@@ -823,14 +829,14 @@ body:not([data-status="playing"]) .meter {
   --slot: 96px;
   position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
   gap: 8px;
   min-height: calc(6 * var(--slot) + 5 * 8px);
   overflow: hidden;
 }
 
-body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]) .board {
+body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]):not([data-status="over"]) .board {
   min-height: 96px;
   justify-content: flex-start;
 }
@@ -1028,14 +1034,12 @@ body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="
   border: 0;
 }
 
-@keyframes settle {
+@keyframes drop {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(var(--drop, 0px));
   }
   to {
-    opacity: 1;
-    transform: none;
+    transform: translateY(0);
   }
 }
 
@@ -1135,7 +1139,7 @@ body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="
     min-height: calc(6 * var(--slot) + 5 * 4px);
   }
 
-  body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]) .board {
+  body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]):not([data-status="over"]) .board {
     min-height: 0;
     justify-content: flex-start;
   }
