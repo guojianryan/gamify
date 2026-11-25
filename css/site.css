@@ -344,7 +344,7 @@ a.button.secondary {
 }
 
 .ruler {
-  margin: 0 0 8px;
+  margin: 8px 0 0;
   color: var(--ink-soft);
   font-family: var(--mono);
   font-size: 1.05rem;
@@ -460,10 +460,16 @@ button.bit:not(:disabled):hover {
 }
 
 .row.entering {
-  animation: drop 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  z-index: 2;
+  animation: drop var(--drop-ms, 8000ms) linear both;
 }
 
-.row.shake {
+.row.entering.frozen {
+  animation-play-state: paused;
+}
+
+.row.shake .bit,
+.row.shake .ticket {
   animation: shake 180ms ease;
 }
 
@@ -754,6 +760,15 @@ legend {
   padding: 16px 28px 8px;
 }
 
+body[data-game="binary"] .shell {
+  margin-top: 12px;
+}
+
+body[data-game="binary"] .play-layout {
+  padding-top: 8px;
+  padding-bottom: 0;
+}
+
 .play {
   min-width: 0;
 }
@@ -777,6 +792,15 @@ legend {
 .meter {
   height: 8px;
   margin-bottom: 10px;
+}
+
+body[data-game="binary"] .meter {
+  margin-bottom: 4px;
+}
+
+body[data-game="binary"] .pressure {
+  margin-bottom: 2px;
+}
   border: 1px solid var(--ink);
   background: #e6dccb;
   overflow: hidden;
@@ -805,13 +829,14 @@ body:not([data-status="playing"]) .meter {
   --slot: 96px;
   position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
   gap: 8px;
   min-height: calc(6 * var(--slot) + 5 * 8px);
+  overflow: hidden;
 }
 
-body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]) .board {
+body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]):not([data-status="over"]) .board {
   min-height: 96px;
   justify-content: flex-start;
 }
@@ -1011,12 +1036,10 @@ body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="
 
 @keyframes drop {
   from {
-    opacity: 0.4;
-    transform: translateY(calc(-5 * var(--slot, 96px)));
+    transform: translateY(var(--drop, 0px));
   }
   to {
-    opacity: 1;
-    transform: none;
+    transform: translateY(0);
   }
 }
 
@@ -1116,7 +1139,7 @@ body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="
     min-height: calc(6 * var(--slot) + 5 * 4px);
   }
 
-  body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]) .board {
+  body:not([data-status="playing"]):not([data-status="paused"]):not([data-status="choose"]):not([data-status="over"]) .board {
     min-height: 0;
     justify-content: flex-start;
   }

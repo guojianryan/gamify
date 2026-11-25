@@ -391,7 +391,7 @@
         }
       }, prefersReducedMotion() ? 0 : CLEAR_MS);
     });
-    state.rows.forEach(function (row) {
+    state.rows.forEach(function (row, index) {
       var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
       if (el && el.dataset.mode !== row.mode) {
         el.remove();
@@ -399,19 +399,40 @@
       }
       if (!el) {
         el = buildRow(row);
-        board.appendChild(el);
+        var live = Array.prototype.filter.call(board.children, function (child) {
+          return !child.classList.contains('clearing');
+        });
+        if (live[index]) board.insertBefore(el, live[index]);
+        else board.appendChild(el);
+        armDrop(el, board);
       }
       updateRow(el, row);
     });
-    state.rows.forEach(function (row) {
-      var el = board.querySelector('[data-id="' + row.id + '"]:not(.clearing)');
-      if (el) board.appendChild(el);
+  }
+
+  function armDrop(el, board) {
+    var ms = logic.spawnDelay(state);
+    var distance = board.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    el.style.setProperty('--drop', distance + 'px');
+    el.style.setProperty('--drop-ms', ms + 'ms');
+    el.dataset.dropMs = String(ms);
+    if (prefersReducedMotion() || distance > -1) return;
+    el.classList.add('entering');
+    if (clock && clock.held) el.classList.add('frozen');
+    el.addEventListener('animationend', function (event) {
+      if (event.animationName === 'drop') el.classList.remove('entering');
+    });
+  }
+
+  function freezeDrops(frozen) {
+    document.querySelectorAll('#board .row.entering').forEach(function (row) {
+      row.classList.toggle('frozen', frozen);
     });
   }
 
   function buildRow(row) {
     var el = document.createElement('article');
-    el.className = 'row entering';
+    el.className = 'row';
     el.dataset.id = String(row.id);
     el.dataset.mode = row.mode;
 
@@ -794,6 +815,7 @@
       started: performance.now(),
       delay: delay
     };
+    freezeDrops(false);
     tickMeter();
   }
 
@@ -813,6 +835,7 @@
     if (frameId) cancelAnimationFrame(frameId);
     frameId = 0;
     clock = { held: true, handle: 0, delay: remaining, fraction: fraction };
+    freezeDrops(true);
     paintMeter();
   }
 
