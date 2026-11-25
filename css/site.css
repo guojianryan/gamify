@@ -353,7 +353,72 @@ a.button.secondary {
 }
 
 body[data-game="binary"] .ruler {
+  margin: 0 0 8px;
+  color: var(--sheet);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+body[data-game="binary"] .ruler .place {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  background: var(--ink);
+  color: var(--sheet);
+}
+
+body[data-game="binary"] .ruler .eq {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.35rem;
+}
+
+body[data-game="binary"] .setup {
+  display: block;
+  padding: 22px 28px 20px;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+body[data-game="binary"] .setup h1 {
   margin: 0 0 6px;
+  font-size: clamp(2.3rem, 4.5vw, 3.3rem);
+}
+
+body[data-game="binary"] .banner-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+body[data-game="binary"] .setup .deck {
+  margin: 0;
+  max-width: 38rem;
+  color: var(--ink);
+}
+
+body[data-game="binary"] .setup form {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+body[data-game="binary"] .best-pace {
+  margin: 14px 0 0;
+  max-width: none;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+body[data-game="binary"][data-status="ready"] .hud,
+body[data-game="binary"][data-status="ready"] .pressure,
+body[data-game="binary"][data-status="ready"] .meter {
+  display: none;
 }
 
 .ruler .place[data-hidden="true"],
@@ -1239,8 +1304,30 @@ body.keypad-open {
   }
 
   body[data-game="binary"] .ruler {
-    margin: 0 0 4px;
-    font-size: 0.68rem;
+    margin: 0 0 6px;
+    font-size: 0.78rem;
+  }
+
+  body[data-game="binary"] .ruler .place {
+    min-height: 30px;
+  }
+
+  body[data-game="binary"] .ruler .eq {
+    display: none;
+  }
+
+  body[data-game="binary"] .banner-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  body[data-game="binary"] .setup {
+    padding: 16px 16px 14px;
+  }
+
+  body[data-game="binary"] .best-pace {
+    margin-top: 12px;
   }
 
   body[data-game="binary"] .board {

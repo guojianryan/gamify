@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/site.css?v=21">
+  <link rel="stylesheet" href="../css/site.css?v=22">
 </head>
 <body data-status="ready" data-game="binary">
   <a class="skip" href="#board">Skip to the column</a>
@@ -28,16 +28,17 @@
       <section id="results" class="results" hidden></section>
 
       <section id="setup" class="setup">
-        <div>
-          <p class="kicker">8-bit drill</p>
-          <h1>Binary game</h1>
-          <p class="deck">Place values sit at the top. The first row is right under them, and new rows are added below. Set the bits when a decimal is showing, or type the decimal when the bits are already set. Six rows fit, and one more arrival ends the round.</p>
+        <p class="kicker">8-bit drill</p>
+        <div class="banner-row">
+          <div>
+            <h1>Binary game</h1>
+            <p class="deck">Eight places, from 128 down to 1. Build the number, or read it. Warm-up, then a 1, 2, or 5 minute race.</p>
+          </div>
+          <form id="setup-form">
+            <button class="button" type="submit" id="start">Start</button>
+          </form>
         </div>
-        <form id="setup-form">
-          <p class="pace-note">Warm-up is slow. After eight clean rows, pick 1, 2, or 5 minutes and score as many points as you can. A faster row is worth more, and the next row arrives based on how fast you have been clearing.</p>
-          <p id="best-pace" class="best-pace" hidden></p>
-          <button class="button" type="submit" id="start">Start</button>
-        </form>
+        <p id="best-pace" class="best-pace" hidden></p>
       </section>
 
       <section class="stage" id="play" aria-label="Binary game">
