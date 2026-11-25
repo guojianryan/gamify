@@ -2,11 +2,11 @@
 
 ## What shipped
 
-A static lesson page at `/gates/` in the Gamify family style. Students read a Boolean expression, build an equivalent circuit with a nested port picker, watch a live truth table, and run an all-combinations signal animation. Level 1 (AND / OR / NOT) starts unlocked; Level 2 (adds XOR / NAND / NOR) unlocks after six Level 1 solves, with a session-only bypass when storage is blocked or for a quick try.
+A static lesson page at `/gates/` in the Gamify family style. Students read a Boolean expression, build an equivalent circuit on an **IEEE-style schematic** (distinctive gate outlines, orthogonal wires, junction dots, A/B/C → Y), watch a live truth table, and run an all-combinations signal animation. Level 1 (AND / OR / NOT) starts unlocked; Level 2 (adds XOR / NAND / NOR) unlocks after six Level 1 solves, with a session-only bypass when storage is blocked or for a quick try.
 
 ## Key design decisions
 
-- **Tree builder instead of freeform wires** — reliable on touch and keyboard, maps cleanly to expression structure, and keeps the signal animation deterministic.
+- **Schematic tree builder** — same nested AST model as before, drawn as textbook logic symbols via SVG (`js/gate-schematic.js`) so the board matches class diagrams without freeform wiring.
 - **Behaviour matching** — `compareBehaviour` equates full truth tables, so De Morgan and other equivalent shapes count as correct.
 - **Gentle speed meter** — bonus decays over a per-puzzle window; running out never fails the puzzle. Relaxed mode hides the meter and still awards the full bonus so unlock progress stays fair.
 - **Mismatch feedback** — lists the first disagreeing input rows with both OUT values.
@@ -20,5 +20,5 @@ A static lesson page at `/gates/` in the Gamify family style. Students read a Bo
 
 - Drag-and-drop wiring for desktop power users (kept out to protect the phone layout).
 - A shared “challenge code” so a teacher can assign the same puzzle sequence.
-- Richer gate SVG symbols; stamped text labels were chosen for clarity at small sizes.
+- Shared input rails / fan-out junctions when the same input feeds multiple gates (tree still duplicates leaf terminals today).
 - Optional “show target truth table” coach mode after several misses.

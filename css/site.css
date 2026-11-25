@@ -1255,68 +1255,150 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 .circuit-board {
   position: relative;
   border: 1.5px solid var(--ink);
-  background:
-    linear-gradient(180deg, rgba(255, 250, 243, 0.9), rgba(239, 230, 214, 0.55)),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 19px,
-      rgba(27, 25, 20, 0.04) 19px,
-      rgba(27, 25, 20, 0.04) 20px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 19px,
-      rgba(27, 25, 20, 0.04) 19px,
-      rgba(27, 25, 20, 0.04) 20px
-    );
+  background: #fffdf8;
   min-height: 220px;
-  padding: 16px;
+  padding: 12px 12px 28px;
   overflow: hidden;
-}
-
-.circuit-board.pulse .wire[data-signal="1"] {
-  animation: wire-pulse 700ms ease;
-}
-
-.circuit-board.pulse .gate-node[data-signal="1"] .gate-head {
-  animation: gate-flash 700ms ease;
 }
 
 .circuit-scroll {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 12px 18px;
+  gap: 4px 10px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
 }
 
-.circuit-tree {
-  display: flex;
-  align-items: center;
+.schematic-wrap {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.schematic {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.sch-wire {
+  stroke: #1b1914;
+  stroke-width: 2.2;
+  fill: none;
+  stroke-linecap: square;
+}
+
+.sch-wire[data-signal="0"] {
+  stroke: #5c5348;
+}
+
+.sch-wire[data-signal="1"] {
+  stroke: var(--moss);
+  stroke-width: 2.6;
+}
+
+.circuit-board.pulse .sch-wire[data-signal="1"] {
+  animation: wire-pulse 700ms ease;
+}
+
+.sch-dot {
+  fill: #1b1914;
+  stroke: none;
+}
+
+.sch-dot[data-signal="1"] {
+  fill: var(--moss);
+}
+
+.gate-body {
+  stroke: #1b1914;
+  pointer-events: none;
+}
+
+.gate-body path,
+.gate-body polygon,
+.gate-body circle,
+.gate-body rect {
+  stroke: inherit;
+}
+
+.sch-gate[data-signal="1"] .gate-body {
+  stroke: var(--moss);
+}
+
+.circuit-board.pulse .sch-gate[data-signal="1"] .gate-body {
+  animation: gate-flash 700ms ease;
+}
+
+.sch-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sch-hit:focus,
+.sch-port:focus {
+  outline: none;
+}
+
+.sch-hit:focus-visible {
+  stroke: var(--stamp);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.sch-port {
+  fill: #1b1914;
+  stroke: #fffdf8;
+  stroke-width: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sch-port.empty {
+  fill: #fffdf8;
+  stroke: #1b1914;
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+
+.sch-port:focus-visible {
+  stroke: var(--stamp);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.sch-input-label,
+.sch-output-label,
+.gate-fallback-label {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  fill: #1b1914;
+  pointer-events: none;
+}
+
+.sch-bit {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--moss);
+  pointer-events: none;
 }
 
 .lamp-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
-}
-
-.wire-out {
-  width: 28px;
-  height: 3px;
-  background: var(--ink);
-  opacity: 0.35;
+  flex: 0 0 auto;
+  padding-right: 4px;
 }
 
 .lamp {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border: 1.5px solid var(--ink);
   border-radius: 50%;
   background: #d9d0c2;
@@ -1326,8 +1408,8 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 }
 
 .lamp-glass {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 1.5px solid var(--ink);
   background: #cfc6b6;
@@ -1347,146 +1429,13 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 
 .lamp-label {
   position: absolute;
-  bottom: -1.4rem;
+  bottom: -1.35rem;
   left: 50%;
   transform: translateX(-50%);
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.port,
-.gate-head {
-  border: 1.5px solid var(--ink);
-  background: var(--ticket);
-  font-family: var(--mono);
+  font-family: var(--sans);
+  font-size: 0.85rem;
   font-weight: 600;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.port {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 12px;
-  font-size: 0.95rem;
-}
-
-.empty-port {
-  border-style: dashed;
-  color: var(--ink-soft);
-  background: rgba(255, 250, 243, 0.7);
-}
-
-.input-node,
-.gate-node {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.input-node {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.input-port {
-  background: #e8f0ea;
-  min-width: 52px;
-}
-
-.gate-node {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 8px;
-  border: 1.5px solid var(--ink);
-  background: rgba(255, 250, 243, 0.88);
-}
-
-.gate-head {
-  min-height: 40px;
-  padding: 0 12px;
-  background: #f7ebe6;
-  font-size: 0.95rem;
-}
-
-.gate-node[data-op="AND"] .gate-head { background: #e7efe8; }
-.gate-node[data-op="OR"] .gate-head { background: #efe8df; }
-.gate-node[data-op="NOT"] .gate-head { background: #f3e4e0; }
-.gate-node[data-op="XOR"] .gate-head { background: #e4ebf3; }
-.gate-node[data-op="NAND"] .gate-head { background: #ebe7f2; }
-.gate-node[data-op="NOR"] .gate-head { background: #f1e9d8; }
-
-.gate-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.gate-slot {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.wire {
-  position: relative;
-  width: 18px;
-  height: 3px;
-  flex: 0 0 auto;
-  background: #9a9082;
-  overflow: hidden;
-}
-
-.wire[data-signal="0"] {
-  background: #6d655a;
-}
-
-.wire[data-signal="1"] {
-  background: var(--moss);
-}
-
-.wire[data-signal="1"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, #c8efd4, transparent);
-  transform: translateX(-100%);
-}
-
-.circuit-board.pulse .wire[data-signal="1"]::after {
-  animation: signal-run 700ms ease;
-}
-
-.signal-bit {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  min-width: 1.1rem;
-  text-align: center;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  pointer-events: none;
-}
-
-.input-node .signal-bit {
-  position: static;
-  margin-top: 2px;
-}
-
-.gate-node[data-signal="1"] .signal-bit,
-.input-node[data-signal="1"] .signal-bit {
-  color: var(--moss);
-}
-
-.gate-node[data-signal="0"] .signal-bit,
-.input-node[data-signal="0"] .signal-bit {
+  letter-spacing: 0.02em;
   color: var(--ink);
 }
 
@@ -1713,17 +1662,13 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
 }
 
 @keyframes wire-pulse {
-  0%, 100% { filter: none; }
-  40% { filter: brightness(1.25); }
-}
-
-@keyframes signal-run {
-  to { transform: translateX(100%); }
+  0%, 100% { stroke-width: 2.6; }
+  40% { stroke-width: 3.6; }
 }
 
 @keyframes gate-flash {
-  0%, 100% { transform: none; }
-  35% { transform: scale(1.04); background: #fff; }
+  0%, 100% { stroke-width: 2.2; }
+  40% { stroke-width: 3.4; }
 }
 
 @keyframes lamp-pop {

@@ -6,9 +6,9 @@ Same paper sheet, stamp red, moss green, Fraunces / Figtree / IBM Plex Mono, tic
 
 ## How the student builds a circuit
 
-A **nested tree builder**, not freeform wires. The output lamp starts empty. The student fills each empty port by choosing an input (A / B / C) or a gate. Gates open new ports. Nesting builds the expression tree. Clear / undo / remove-at-port keep edits cheap on touch and keyboard.
+A **schematic tree builder** drawn as an IEEE-style logic diagram (distinctive gate outlines, orthogonal wires, junction dots, A/B/C on the left and Y on the right). The output starts empty. The student fills each empty port by choosing an input (A / B / C) or a gate. Gates open new ports. Nesting builds the expression tree. Clear / undo / remove-at-port keep edits cheap on touch and keyboard.
 
-Why this shape: freeform wiring fights phones; a tree matches how Boolean expressions nest; every circuit is a valid AST so evaluation and the signal animation stay simple.
+Why this shape: freeform wiring fights phones; a tree matches how Boolean expressions nest; every circuit is a valid AST so evaluation and the signal animation stay simple; the diagram matches the symbols students see in textbooks.
 
 ## Expressions and content
 
