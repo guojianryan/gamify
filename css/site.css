@@ -338,7 +338,7 @@ a.button.secondary {
 .ruler,
 .row {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr)) minmax(72px, 112px);
+  grid-template-columns: repeat(8, minmax(0, 1fr)) minmax(96px, 148px);
   gap: 6px;
   align-items: stretch;
 }
@@ -347,7 +347,7 @@ a.button.secondary {
   margin: 0 0 8px;
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 1.05rem;
   text-align: center;
 }
 
@@ -366,14 +366,14 @@ a.button.secondary {
 .bit {
   display: grid;
   place-items: center;
-  height: clamp(46px, 6vw, 58px);
+  height: clamp(68px, 10vw, 88px);
   min-width: 0;
   padding: 0;
   border: 1.5px solid var(--ink);
   background: var(--ticket);
   color: #8d8478;
   font-family: var(--mono);
-  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-size: clamp(1.7rem, 3.4vw, 2.35rem);
   font-weight: 600;
   line-height: 1;
   touch-action: manipulation;
@@ -400,7 +400,7 @@ button.bit:not(:disabled):hover {
 }
 
 .ticket {
-  min-height: 58px;
+  min-height: 80px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -416,14 +416,15 @@ button.bit:not(:disabled):hover {
 
 .target {
   font-family: var(--mono);
-  font-size: 1.3rem;
+  font-size: clamp(2rem, 4vw, 2.75rem);
   font-weight: 600;
+  line-height: 1;
 }
 
 .sum {
   min-height: 1em;
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 1.05rem;
   color: var(--ink-soft);
 }
 
@@ -433,12 +434,13 @@ button.bit:not(:disabled):hover {
 
 .ticket input {
   width: 100%;
-  min-height: 54px;
+  min-height: 76px;
   border: 0;
   background: transparent;
   text-align: center;
   font-family: var(--mono);
-  font-size: 1.3rem;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 600;
   padding: 0;
 }
 
@@ -468,7 +470,7 @@ button.bit:not(:disabled):hover {
   margin: 0;
   padding: 4px 2px 0;
   font-family: var(--mono);
-  font-size: 0.92rem;
+  font-size: 1.05rem;
   line-height: 1.35;
   color: var(--stamp);
 }
@@ -634,7 +636,7 @@ legend {
 
 .stat strong {
   font-family: var(--mono);
-  font-size: 1.45rem;
+  font-size: 1.9rem;
   font-weight: 600;
   line-height: 1;
 }
@@ -696,6 +698,7 @@ legend {
 }
 
 .hud-controls {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
@@ -855,36 +858,16 @@ body:not([data-status="playing"]):not([data-status="paused"]) .board {
   font-size: 0.92rem;
 }
 
-.keypad {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  background: var(--sheet);
-  border-top: 1.5px solid var(--ink);
-}
-
-body[data-game="binary"] {
-  --keypad-space: 292px;
-}
-
-body[data-game="binary"] .shell {
-  margin-bottom: 0;
-  padding-bottom: calc(var(--keypad-space) + 28px);
-}
-
 .menu-panel {
-  position: fixed;
-  right: 12px;
-  bottom: calc(var(--keypad-space) + 8px + env(safe-area-inset-bottom));
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
   z-index: 21;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
-  width: min(260px, calc(100% - 24px));
+  width: min(260px, calc(100vw - 24px));
   padding: 12px;
   border: 1.5px solid var(--ink);
   background: var(--ticket);
@@ -920,39 +903,6 @@ body[data-game="binary"] .shell {
   font-size: clamp(3.2rem, 12vw, 6rem);
   letter-spacing: -0.04em;
   line-height: 0.9;
-}
-
-.keypad-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.keypad-grid button {
-  height: 46px;
-  border: 1.5px solid var(--ink);
-  background: var(--ticket);
-  font-family: var(--mono);
-  font-size: 1.05rem;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.keypad-grid button:not(:disabled):hover {
-  background: #fff;
-}
-
-.keypad-grid button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.keypad-grid button[data-key="enter"] {
-  grid-column: 1 / -1;
-  background: var(--ink);
-  color: var(--sheet);
 }
 
 .tips ul {
@@ -1035,7 +985,20 @@ body[data-game="binary"] .shell {
 
   .ticket {
     grid-column: 1 / -1;
-    min-height: 52px;
+    min-height: 72px;
+  }
+
+  .ticket input {
+    min-height: 68px;
+    font-size: 2.5rem;
+  }
+
+  .target {
+    font-size: 2.5rem;
+  }
+
+  .ruler {
+    font-size: 1rem;
   }
 
   .ruler .eq {
@@ -1043,8 +1006,8 @@ body[data-game="binary"] .shell {
   }
 
   .bit {
-    height: 68px;
-    font-size: 1.45rem;
+    height: 80px;
+    font-size: 2.15rem;
   }
 
   .board,

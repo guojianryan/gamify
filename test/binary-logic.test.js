@@ -29,47 +29,69 @@ test('every byte round-trips through the place values', () => {
   assert.equal(L.expression(0), '0');
 });
 
-test('level pace grows the numbers, then hides place values', () => {
-  assert.equal(L.levelConfig(1).maxValue, 15);
-  assert.equal(L.levelConfig(1).bitsBias, 1);
+test('level pace keeps a full byte, then hides place values and tightens the clock', () => {
+  assert.equal(L.levelConfig(1).maxValue, 255);
+  assert.equal(L.levelConfig(1).bitsBias, 0.5);
   assert.equal(L.levelConfig(1).showValues, true);
-  assert.equal(L.levelConfig(1).spawnMs, 11000);
-  assert.equal(L.levelConfig(2).maxValue, 31);
-  assert.equal(L.levelConfig(3).maxValue, 63);
-  assert.equal(L.levelConfig(3).bitsBias, 0.75);
+  assert.equal(L.levelConfig(1).spawnMs, 4200);
+  assert.equal(L.levelConfig(3).maxValue, 255);
+  assert.equal(L.levelConfig(3).bitsBias, 0.5);
   assert.equal(L.levelConfig(3).showValues, true);
-  assert.equal(L.levelConfig(4).showValues, false);
-  assert.equal(L.levelConfig(4).maxValue, 127);
+  assert.equal(L.levelConfig(3).spawnMs, 3100);
+  assert.equal(L.levelConfig(4).showValues, true);
   assert.equal(L.levelConfig(5).maxValue, 255);
   assert.equal(L.levelConfig(5).bitsBias, 0.5);
-  assert.equal(L.levelConfig(6).bitsBias, 0.45);
-  assert.equal(L.levelConfig(7).spawnMs, 3200);
-  assert.equal(L.levelConfig(12).spawnMs, 3200);
-  assert.ok(L.levelConfig(1).spawnMs > L.levelConfig(4).spawnMs);
+  assert.equal(L.levelConfig(5).showValues, false);
+  assert.equal(L.levelConfig(5).spawnMs, 2000);
+  assert.equal(L.levelConfig(6).bitsBias, 0.5);
+  assert.equal(L.levelConfig(7).spawnMs, 1600);
+  assert.equal(L.levelConfig(12).spawnMs, 1600);
+  assert.ok(L.levelConfig(1).spawnMs > L.levelConfig(3).spawnMs);
+  assert.ok(L.levelConfig(3).spawnMs > L.levelConfig(5).spawnMs);
 });
 
-test('a warm-up row is bits only, inside 1..15, and does not repeat', () => {
-  const started = L.startGame(L.createGame(40), () => 0.99, { level: 1 });
+test('a row is an even draw from 0 to 255, both directions, and does not repeat', () => {
+  const started = L.startGame(L.createGame(40), sequence([0.99, 0]), { level: 1 });
   const row = started.state.rows[0];
   assert.equal(started.state.status, 'playing');
   assert.equal(started.state.highScore, 40);
   assert.equal(started.state.score, 0);
   assert.equal(started.events[0].type, 'spawn');
   assert.equal(row.mode, 'bits');
-  assert.equal(row.value, 15);
+  assert.equal(row.value, Math.floor(0.99 * 256));
+  assert.ok(row.value >= 250);
   assert.deepEqual(row.bits, [0, 0, 0, 0, 0, 0, 0, 0]);
 
-  const again = L.spawnRow(started.state, () => 0.99);
-  assert.notEqual(again.state.rows[1].value, 15);
-  assert.ok(again.state.rows[1].value >= 1);
-  assert.ok(again.state.rows[1].value <= 15);
+  const again = L.spawnRow(started.state, sequence([0.99, 0.9]));
+  assert.equal(again.state.rows[1].mode, 'decimal');
+  assert.notEqual(again.state.rows[1].value, row.value);
+  assert.ok(again.state.rows[1].value >= 0);
+  assert.ok(again.state.rows[1].value <= 255);
+
+  const zero = L.spawnRow(
+    { ...L.createGame(), status: 'playing', level: 1 },
+    sequence([0, 0])
+  ).state.rows[0];
+  assert.equal(zero.value, 0);
+  assert.equal(zero.mode, 'decimal');
+  assert.deepEqual(zero.bits, L.bitsFor(0));
+
+  const full = L.spawnRow(
+    { ...L.createGame(), status: 'playing', level: 5 },
+    sequence([255 / 256, 0.5])
+  ).state.rows[0];
+  assert.equal(full.value, 255);
+  assert.equal(full.mode, 'decimal');
 });
 
 test('a wrong bit stays up with the working, then one retry scores half', () => {
-  let state = L.startGame(L.createGame(), () => 0).state;
+  const rng = sequence([0.004, 0, 0.008, 0]);
+  let state = L.startGame(L.createGame(), rng).state;
   const first = state.rows[0];
-  state = L.spawnRow(state, () => 0).state;
+  state = L.spawnRow(state, rng).state;
   const second = state.rows[1];
+  assert.equal(first.mode, 'bits');
+  assert.equal(second.mode, 'bits');
   assert.equal(first.value, 1);
   assert.equal(second.value, 2);
 
@@ -99,14 +121,14 @@ test('a wrong bit stays up with the working, then one retry scores half', () => 
 });
 
 test('eight clean rows move from Warm-up to Drill and total 660', () => {
-  let state = L.startGame(L.createGame(), () => 0).state;
+  let state = L.startGame(L.createGame(), () => 0.1).state;
   let last = null;
   for (let i = 0; i < 7; i += 1) {
-    if (state.rows.length === 0) state = L.spawnRow(state, () => 0).state;
+    if (state.rows.length === 0) state = L.spawnRow(state, () => 0.1).state;
     state = solveBits(state);
   }
   assert.equal(state.level, 1);
-  if (state.rows.length === 0) state = L.spawnRow(state, () => 0).state;
+  if (state.rows.length === 0) state = L.spawnRow(state, () => 0.1).state;
   const row = state.rows[0];
   L.bitsFor(row.value).forEach((bit, index) => {
     if (!bit) return;
@@ -126,7 +148,7 @@ test('eight clean rows move from Warm-up to Drill and total 660', () => {
 
 test('decimal rows stay until the typed total is right', () => {
   let state = { ...L.createGame(), status: 'playing', level: 5, streak: 4, score: 200 };
-  state = L.spawnRow(state, sequence([0, 0.99])).state;
+  state = L.spawnRow(state, sequence([0.004, 0.99])).state;
   const row = state.rows[0];
   assert.equal(row.mode, 'decimal');
   assert.equal(row.value, 1);
@@ -188,10 +210,14 @@ test('the column ends the round when a seventh row would arrive', () => {
 });
 
 test('pause blocks play until resume', () => {
-  const started = L.startGame(L.createGame(), () => 0);
+  const started = L.startGame(L.createGame(), sequence([0.004, 0]));
   const paused = L.pauseGame(started.state);
   assert.equal(paused.state.status, 'paused');
-  assert.equal(L.toggleBit(paused.state, paused.state.rows[0].id, 7).state.rows.length, 1);
+  assert.equal(paused.state.rows[0].value, 1);
+  assert.equal(paused.state.rows[0].mode, 'bits');
+  const blocked = L.toggleBit(paused.state, paused.state.rows[0].id, 7);
+  assert.equal(blocked.state.rows.length, 1);
+  assert.equal(blocked.state.rows[0].bits[7], 0);
   assert.equal(L.spawnRow(paused.state).events.length, 0);
   const resumed = L.resumeGame(paused.state);
   assert.equal(resumed.state.status, 'playing');
@@ -255,11 +281,11 @@ test('the guided first row is 10, and a clean miss names both places', () => {
 });
 
 test('misses and the best pace carry into the next warm-up', () => {
-  let state = L.startGame(L.createGame(), () => 0).state;
+  let state = L.startGame(L.createGame(), sequence([0.004, 0])).state;
   state = L.toggleBit(state, state.rows[0].id, 0).state;
   const misses = state.misses.slice();
   state = { ...state, paceIndex: 2, bestPaceIndex: 2, level: 5 };
-  const next = L.startGame(state, () => 0).state;
+  const next = L.startGame(state, sequence([0.004, 0])).state;
   assert.deepEqual(next.misses, misses);
   assert.equal(next.bestPaceIndex, 2);
   assert.equal(next.paceIndex, 0);

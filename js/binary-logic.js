@@ -16,22 +16,12 @@
   var MAX_ROWS = 6;
   var SOLVES_PER_LEVEL = 8;
   var CLEAN_ROWS_PER_PACE = 8;
-  var SPAWN_FLOOR_MS = 3200;
+  var SPAWN_FLOOR_MS = 1600;
   var GUIDE_VALUE = 10;
   var PACES = [
     { id: 'warmup', name: 'Warm-up', level: 1 },
     { id: 'drill', name: 'Drill', level: 3 },
     { id: 'exam', name: 'Exam pace', level: 5 }
-  ];
-
-  // Level 1–2 are small numbers and bit-setting only, with place values shown.
-  // From level 3 the drill mixes in "read the bits". Place values hide at level 4.
-  var LEVELS = [
-    { maxValue: 15, bitsBias: 1, showValues: true },
-    { maxValue: 31, bitsBias: 1, showValues: true },
-    { maxValue: 63, bitsBias: 0.75, showValues: true },
-    { maxValue: 127, bitsBias: 0.6, showValues: false },
-    { maxValue: 255, bitsBias: 0.5, showValues: false }
   ];
 
   function normalizeLevel(level) {
@@ -41,17 +31,17 @@
     return n;
   }
 
+  // Every pace draws uniformly from 0..255, and setting bits is as common as
+  // reading them. Hardness is the clock and, at Exam pace, hidden place values.
   function levelConfig(level) {
     var n = normalizeLevel(level);
-    var row = LEVELS[Math.min(n, LEVELS.length) - 1];
-    var bitsBias = n >= 6 ? 0.45 : row.bitsBias;
-    var spawnMs = Math.max(SPAWN_FLOOR_MS, 11000 - (n - 1) * 1300);
+    var spawnMs = Math.max(SPAWN_FLOOR_MS, 4200 - (n - 1) * 550);
     return {
       level: n,
       bits: BIT_VALUES.length,
-      maxValue: row.maxValue,
-      bitsBias: bitsBias,
-      showValues: row.showValues,
+      maxValue: 255,
+      bitsBias: 0.5,
+      showValues: n < 5,
       spawnMs: spawnMs
     };
   }
@@ -185,12 +175,13 @@
   }
 
   function randomValue(max, rng, avoid) {
-    var cap = Math.max(1, max | 0);
-    var value = 1 + Math.floor(rng() * cap);
+    var cap = Math.max(0, max | 0);
+    var span = cap + 1;
+    var value = Math.floor(rng() * span);
     if (value > cap) value = cap;
-    if (value < 1) value = 1;
-    if (value === avoid && cap > 1) {
-      value = value === cap ? 1 : value + 1;
+    if (value < 0) value = 0;
+    if (value === avoid && span > 1) {
+      value = value === cap ? 0 : value + 1;
     }
     return value;
   }
@@ -334,6 +325,8 @@
     var config = levelConfig(state.level);
     var value = randomValue(config.maxValue, random, state.lastValue);
     var mode = random() < config.bitsBias ? 'bits' : 'decimal';
+    // An all-zero bit row would already equal 0, so that draw is typed instead.
+    if (mode === 'bits' && value === 0) mode = 'decimal';
     var row = blankRow(state.nextId, mode, value);
     return {
       state: copyState(state, {

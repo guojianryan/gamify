@@ -18,10 +18,11 @@ An 8-bit conversion drill. Rows fill a six-row column from the top.
 - Bits already set, with a blank on the right, means you type the decimal and press Enter.
 - The round ends when a new row would pass the top of the column.
 - A wrong pattern stays on screen with the working written out. One retry on that row scores half, and the spawn clock waits while you read it.
-- Eight clean rows move the pace from Warm-up to Drill, then to Exam pace. Numbers get larger, rows arrive faster, and the place values hide at Exam pace unless you pin them.
+- Eight clean rows move the pace from Warm-up to Drill, then to Exam pace. Every pace draws evenly from 0 to 255, and setting bits is as common as reading them. Rows arrive sooner as the pace rises, and the place values hide at Exam pace unless you pin them.
 - The first visit opens on 10, with the 8 and the 2 marked. After that, the instructions stay in the menu.
+- A decimal row is typed with the phone keyboard or a hardware keyboard. There is no on-screen keypad.
 
-Warm-up is numbers 1–15, bits only. Drill reaches 63 and mixes in reading bits. Exam pace is full bytes, 1–255, with the place values hidden.
+Warm-up, Drill, and Exam pace all use the full byte. Warm-up gives about four seconds before the next row. Drill is tighter. Exam pace is about two seconds, with the place values hidden.
 
 Best score, best pace, and which place values you miss stay in this browser (`localStorage`).
 
