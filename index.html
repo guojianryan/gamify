@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gamify — lesson games</title>
+  <meta name="description" content="Gamify is a home for class games. Start with the 8-bit binary drill: set the bits or read them before the column fills.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <a class="skip" href="#try">Skip to the try-it row</a>
+  <div class="shell">
+    <header class="mast">
+      <a class="brand" href="./">Gamify</a>
+      <nav aria-label="Lessons">
+        <a href="binary/">Binary game</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="kicker">Lesson arcade</p>
+          <h1>Make binary <em>a reflex.</em></h1>
+          <p class="deck">A home for class games. The first one is an 8-bit drill: rows fill a column, you set the bits or read them, and the round ends when the column is full.</p>
+          <div class="actions">
+            <a class="button" href="binary/">Play the binary game</a>
+            <a class="button secondary" href="#rules">How a round works</a>
+          </div>
+          <p id="landing-best" class="best-line" hidden></p>
+        </div>
+
+        <div class="appliance" id="try">
+          <p class="kicker">Try one row</p>
+          <div class="ruler" id="demo-ruler" aria-hidden="true"></div>
+          <div class="row" id="demo-row"></div>
+          <p id="demo-note">Click a bit. A 1 adds its place value.</p>
+          <button type="button" class="button secondary" id="demo-next">Next number</button>
+        </div>
+      </section>
+
+      <section class="section" id="worked">
+        <h2>77, in one byte</h2>
+        <p>Start at the left. 128 is too big. 64 fits, and 13 is left. 8, then 4, then 1 finish it: <strong>64 + 8 + 4 + 1 = 77</strong>.</p>
+        <div class="byte-block">
+          <div class="ruler" aria-hidden="true">
+            <span class="place">128</span>
+            <span class="place">64</span>
+            <span class="place">32</span>
+            <span class="place">16</span>
+            <span class="place">8</span>
+            <span class="place">4</span>
+            <span class="place">2</span>
+            <span class="place">1</span>
+            <span class="eq">=</span>
+          </div>
+          <div class="row static" role="img" aria-label="77 in binary is 0100 1101, which is 64 plus 8 plus 4 plus 1">
+            <span class="bit">0</span>
+            <span class="bit on">1</span>
+            <span class="bit">0</span>
+            <span class="bit">0</span>
+            <span class="bit on">1</span>
+            <span class="bit on">1</span>
+            <span class="bit">0</span>
+            <span class="bit on">1</span>
+            <div class="ticket"><strong class="target">77</strong></div>
+          </div>
+        </div>
+        <p class="caption">An IPv4 octet is one of these bytes, from 0 to 255. Odd numbers always end in 1.</p>
+      </section>
+
+      <section class="section" aria-labelledby="bench-title">
+        <h2 id="bench-title">On the bench</h2>
+        <p>Each game gets its own page. Binary is the one you can play.</p>
+        <ol class="bench">
+          <li>
+            <span class="index">01</span>
+            <div>
+              <h3><a href="binary/">Binary game</a></h3>
+              <p>Eight bits, two directions, and a column that holds six rows.</p>
+            </div>
+            <a class="go" href="binary/">Play</a>
+          </li>
+          <li>
+            <span class="index">02</span>
+            <div>
+              <h3>Subnet masks</h3>
+              <p>A later page. Prefixes, masks, and the same place values.</p>
+            </div>
+            <span class="later">Later</span>
+          </li>
+          <li>
+            <span class="index">03</span>
+            <div>
+              <h3>Hexadecimal</h3>
+              <p>A later page. Nibbles first, then a full byte.</p>
+            </div>
+            <span class="later">Later</span>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section rules" id="rules">
+        <h2>How a round works</h2>
+        <ol class="steps">
+          <li>
+            <strong>Set the bits</strong>
+            A decimal on the right means you build it. Click a column to turn that bit on or off. The row clears when the 1s add up.
+          </li>
+          <li>
+            <strong>Read the bits</strong>
+            Bits already filled, and a blank on the right, means you read them. Type the decimal and press Enter.
+          </li>
+          <li>
+            <strong>Stay ahead of the column</strong>
+            New rows arrive under the ones already there. Six fit. The next arrival ends the round. Eight clears raise the level.
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>Place values: 128, 64, 32, 16, 8, 4, 2, 1. A 1 adds its place. A 0 adds nothing.</p>
+      <p>Scores stay in this browser.</p>
+    </footer>
+  </div>
+  <noscript>The try-it row and the game need JavaScript. The worked example above still shows how 77 is written in binary.</noscript>
+  <script src="js/binary-logic.js"></script>
+  <script src="js/landing.js"></script>
+</body>
+</html>
