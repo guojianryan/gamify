@@ -2245,6 +2245,11 @@ body.keypad-open {
   font-weight: 600;
 }
 
+.clear-flash.reset {
+  background: #f8ebe7;
+  color: var(--stamp);
+}
+
 .clear-flash.show {
   animation: bitris-flash 700ms ease;
 }

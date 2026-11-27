@@ -36,7 +36,7 @@ node --test test/binary-logic.test.js
 
 ## Bitris
 
-A Tetris-like binary game. Eight columns are place values 128…1. Bit pieces fall; a row clears when its ON bits sum exactly to the target.
+A Tetris-like binary game. Eight columns are place values 128…1. Bit pieces fall; a row clears when its ON bits sum exactly to the target. Overshooting a target soft-resets that row (bits wipe, same target).
 
 - Warm-up is eight clears with rising number size, then a 1 / 2 / 5 minute race.
 - Keyboard and on-screen pad. Live row-sum coach optional.

@@ -10,7 +10,8 @@ Same paper sheet, stamp, moss, Fraunces / Figtree / IBM Plex Mono as Binary and 
 - **Bit pieces** (1–3 ON cells) fall, slide, and rotate.
 - On lock, bits fill empty cells. Each row gets a **target** the first time it receives a bit.
 - When a row’s ON bits **sum exactly** to its target, that row clears (with a short `64 + 8 + 2 = 74` flash). Rows above drop.
-- Stack to the top → round over. Exact sums only — overshoot stays until you clear other rows and relieve pressure (targets stay completable when assigned).
+- **Overshoot soft-reset:** if a lock makes `sum > target`, that row’s bits wipe and the same target stays. No points. Exact clears still score.
+- Stack to the top → round over.
 
 ## Targets
 
