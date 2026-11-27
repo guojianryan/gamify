@@ -8,7 +8,7 @@ Open it with any static server:
 python3 -m http.server 8000
 ```
 
-Then visit `/`, `/binary/`, `/bitris/`, and `/gates/`.
+Then visit `/`, `/binary/`, `/hex/`, and `/gates/`.
 
 ## Binary game
 
@@ -34,16 +34,16 @@ The rules live in `js/binary-logic.js` and do not touch the page, so they can be
 node --test test/binary-logic.test.js
 ```
 
-## Bitris
+## Hex Match
 
-A Tetris-like binary game. Eight columns are place values 128…1. Bit pieces fall; a row clears when its ON bits sum exactly to the target. Overshooting a target soft-resets that row (bits wipe, same target).
+Hex ↔ bits drill. Same warm-up / race shell as Binary. First four clean clears are one nibble (`0`–`F`); then a full byte.
 
-- Warm-up is eight clears with rising number size, then a 1 / 2 / 5 minute race.
-- Keyboard and on-screen pad. Live row-sum coach optional.
-- Design note: `bitris/DESIGN.md`.
+- Hex on the right: tap bits until they match.
+- Bits already set: type the hex on a 0–F keypad.
+- Design note: `hex/DESIGN.md`.
 
 ```bash
-node --test test/bitris-logic.test.js
+node --test test/hex-logic.test.js
 ```
 
 ## Logic Gate Lab
