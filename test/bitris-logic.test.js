@@ -56,9 +56,31 @@ test('locking without an exact sum leaves the bits in place', () => {
   };
   const locked = L.lockPiece(state, 0);
   assert.ok(!locked.events.some((e) => e.type === 'clear'));
+  assert.ok(!locked.events.some((e) => e.type === 'soft_reset'));
   assert.equal(locked.state.board[L.ROWS - 1].cells[7], 1);
   assert.equal(locked.state.board[L.ROWS - 1].target, 3);
   assert.equal(L.rowSum(locked.state.board[L.ROWS - 1]), 1);
+});
+
+test('overshoot soft-resets the row and keeps the target', () => {
+  const rng = () => 0.5;
+  let state = L.withRng(L.startGame(L.createGame(), rng).state, rng);
+  state.piece = { shape: [[1]], row: L.ROWS - 1, col: 7 }; // +1
+  state.board = L.emptyBoard();
+  state.board[L.ROWS - 1] = {
+    cells: [0, 0, 0, 0, 0, 0, 1, 0], // already 2
+    target: 2
+  };
+  const locked = L.lockPiece(state, 0);
+  const reset = locked.events.find((e) => e.type === 'soft_reset');
+  assert.ok(reset);
+  assert.equal(reset.rows[0].target, 2);
+  assert.equal(reset.rows[0].sum, 3);
+  assert.ok(!locked.events.some((e) => e.type === 'clear'));
+  assert.deepEqual(locked.state.board[L.ROWS - 1].cells, [0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(locked.state.board[L.ROWS - 1].target, 2);
+  assert.equal(locked.state.score, state.score);
+  assert.equal(locked.state.clears, 0);
 });
 
 test('move and rotate respect edges and filled cells', () => {

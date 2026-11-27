@@ -141,7 +141,9 @@
     state = logic.withRng(result.state, Math.random);
     applyEvents(result.events);
     renderAll();
-    if (result.events.some(function (e) { return e.type === 'lock' || e.type === 'clear'; })) {
+    if (result.events.some(function (e) {
+      return e.type === 'lock' || e.type === 'clear' || e.type === 'soft_reset';
+    })) {
       restartGravity();
     }
   }
@@ -165,7 +167,9 @@
       state = logic.withRng(result.state, Math.random);
       applyEvents(result.events);
       renderAll();
-      if (result.events.some(function (e) { return e.type === 'lock' || e.type === 'over' || e.type === 'warmup_done'; })) {
+      if (result.events.some(function (e) {
+        return e.type === 'lock' || e.type === 'over' || e.type === 'warmup_done' || e.type === 'soft_reset';
+      })) {
         restartGravity();
       }
     }, state.gravityMs || 900);
@@ -213,7 +217,17 @@
         flashClear(event.expression);
         announce('Cleared. ' + event.expression + '. +' + event.gained);
       }
-      if (event.type === 'lock' && !events.some(function (e) { return e.type === 'clear'; })) {
+      if (event.type === 'soft_reset') {
+        soundReset();
+        flashClear('Overshot — try ' + event.rows.map(function (row) {
+          return row.target;
+        }).join(', ') + ' again', 'reset');
+        announce('Overshot. Row reset. Same target.');
+        toast('Overshot — bits cleared, same target.');
+      }
+      if (event.type === 'lock' && !events.some(function (e) {
+        return e.type === 'clear' || e.type === 'soft_reset';
+      })) {
         soundLock();
       }
       if (event.type === 'rotate' || event.type === 'move') {
@@ -461,16 +475,18 @@
     gain.classList.add('pop');
   }
 
-  function flashClear(text) {
+  function flashClear(text, kind) {
     var el = document.getElementById('clear-flash');
     el.hidden = false;
     el.textContent = text;
+    el.classList.toggle('reset', kind === 'reset');
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');
     window.clearTimeout(flashTimer);
     flashTimer = window.setTimeout(function () {
       el.hidden = true;
+      el.classList.remove('reset');
     }, prefersReducedMotion() ? 1200 : 1600);
   }
 
@@ -552,10 +568,32 @@
 
   function soundTick() { ensureAudio(); beep(380, 0.03, 'triangle', 0.02); }
   function soundLock() { ensureAudio(); beep(220, 0.06, 'square', 0.035); }
+  function soundReset() {
+    ensureAudio();
+    beep(260, 0.08, 'triangle', 0.03);
+    window.setTimeout(function () { beep(180, 0.1, 'triangle', 0.025); }, 70);
+  }
   function soundClear() {
     ensureAudio();
     beep(523, 0.07, 'square', 0.05);
     window.setTimeout(function () { beep(784, 0.1, 'square', 0.05); }, 70);
   }
   function soundOver() { ensureAudio(); beep(160, 0.25, 'sawtooth', 0.04); }
+
+  // Small seam for browser smoke / demos. Not used by the page itself.
+  window.BitrisHarness = {
+    run: function (fn) {
+      var result = fn(logic, state);
+      if (!result || !result.state) return null;
+      state = logic.withRng(result.state, Math.random);
+      applyEvents(result.events || []);
+      renderAll();
+      if ((result.events || []).some(function (e) {
+        return e.type === 'lock' || e.type === 'clear' || e.type === 'soft_reset';
+      })) {
+        restartGravity();
+      }
+      return result;
+    }
+  };
 })();

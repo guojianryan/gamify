@@ -1,6 +1,7 @@
 // Pure rules for Bitris — a Tetris-like 8-bit place-value game.
 // Columns are 128..1. Falling bit pieces lock into the well. A row clears
-// when its ON bits sum exactly to that row's target.
+// when its ON bits sum exactly to that row's target. Overshoot soft-resets
+// the row (bits wipe, same target) so a bad drop is recoverable.
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) {
@@ -57,6 +58,13 @@
     var cells = [];
     for (var c = 0; c < COLS; c += 1) cells.push(0);
     return { cells: cells, target: null };
+  }
+
+  // Wipe ON bits but keep the target so the player can try the same sum again.
+  function softResetRow(row) {
+    var cells = [];
+    for (var c = 0; c < COLS; c += 1) cells.push(0);
+    return { cells: cells, target: row.target };
   }
 
   function emptyBoard() {
@@ -399,15 +407,25 @@
     });
 
     var cleared = [];
+    var reset = [];
     var kept = [];
     for (r = 0; r < ROWS; r += 1) {
       var row = board[r];
-      if (row.target != null && rowSum(row) === row.target) {
+      var sum = rowSum(row);
+      if (row.target != null && sum === row.target) {
         cleared.push({
           index: r,
           target: row.target,
           expression: rowExpression(row) + ' = ' + row.target
         });
+      } else if (row.target != null && sum > row.target) {
+        reset.push({
+          index: r,
+          target: row.target,
+          sum: sum,
+          expression: rowExpression(row) + ' > ' + row.target
+        });
+        kept.push(softResetRow(row));
       } else {
         kept.push(row);
       }
@@ -442,6 +460,15 @@
       });
     } else {
       combo = 0;
+    }
+
+    if (reset.length) {
+      events.push({
+        type: 'soft_reset',
+        lines: reset.length,
+        expression: reset.map(function (item) { return item.expression; }).join(' · '),
+        rows: reset
+      });
     }
 
     var nextState = Object.assign({}, state, {
@@ -562,6 +589,7 @@
     limitLabel: limitLabel,
     emptyBoard: emptyBoard,
     cloneBoard: cloneBoard,
+    softResetRow: softResetRow,
     rowSum: rowSum,
     rowExpression: rowExpression,
     rotateShape: rotateShape,
