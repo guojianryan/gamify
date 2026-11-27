@@ -8,7 +8,7 @@ Open it with any static server:
 python3 -m http.server 8000
 ```
 
-Then visit `/`, `/binary/`, and `/gates/`.
+Then visit `/`, `/binary/`, `/bitris/`, and `/gates/`.
 
 ## Binary game
 
@@ -32,6 +32,18 @@ The rules live in `js/binary-logic.js` and do not touch the page, so they can be
 
 ```bash
 node --test test/binary-logic.test.js
+```
+
+## Bitris
+
+A Tetris-like binary game. Eight columns are place values 128…1. Bit pieces fall; a row clears when its ON bits sum exactly to the target.
+
+- Warm-up is eight clears with rising number size, then a 1 / 2 / 5 minute race.
+- Keyboard and on-screen pad. Live row-sum coach optional.
+- Design note: `bitris/DESIGN.md`.
+
+```bash
+node --test test/bitris-logic.test.js
 ```
 
 ## Logic Gate Lab
